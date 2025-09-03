@@ -1,0 +1,7 @@
+0000000000000000000000000000000000000000 8a8e52be078d7f52b74e893f9809e0cb9f116aa1 bmcapaz <42371635-bmcapaz@users.noreply.replit.com> 1746561935 +0000	commit (initial): Initial commit
+8a8e52be078d7f52b74e893f9809e0cb9f116aa1 4c78ddf9dd57ddf5535702f6eb5db95c68aff36d bmcapaz <42371635-bmcapaz@users.noreply.replit.com> 1746561935 +0000	commit: Initial checkpoint
+4c78ddf9dd57ddf5535702f6eb5db95c68aff36d 71813478bcb6712bca60a45cec2cd94f87ad489d bmcapaz <42371635-bmcapaz@users.noreply.replit.com> 1746562329 +0000	commit: Create main structure and core components for delegate Twitter feature
+71813478bcb6712bca60a45cec2cd94f87ad489d 668189fcaa65143a92586b9b82a1454bdcd35313 bmcapaz <42371635-bmcapaz@users.noreply.replit.com> 1746563300 +0000	commit: Add ability to post tweets with media and customize the site's appearance
+668189fcaa65143a92586b9b82a1454bdcd35313 fab82f4da3bff1f0597a3bfdd82f5a286a689a09 bmcapaz <42371635-bmcapaz@users.noreply.replit.com> 1746563560 +0000	commit: Allow users to customize their profiles and upload images
+fab82f4da3bff1f0597a3bfdd82f5a286a689a09 4d942af7b01441b4c168cb46263411ec37766ebb bmcapaz <42371635-bmcapaz@users.noreply.replit.com> 1746563780 +0000	commit: Add admin panel with user management and tweet deletion features
+4d942af7b01441b4c168cb46263411ec37766ebb ba9b28732c47f0a96b4e5494197773ea0e7c07e4 bmcapaz <42371635-bmcapaz@users.noreply.replit.com> 1746564408 +0000	commit: Enhance user interface with improved navigation and color scheme
