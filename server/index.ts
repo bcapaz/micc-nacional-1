@@ -43,7 +43,7 @@ async function main() {
 
   if (process.env.NODE_ENV === "production") {
     // CORREÇÃO FINAL: O caminho agora é relativo ao local do ficheiro do servidor
-    const clientBuildPath = path.resolve(__dirname, "../client/dist");
+    const clientBuildPath = path.resolve(__dirname, "../client");
     console.log(`[server]: Servindo ficheiros estáticos de: ${clientBuildPath}`);
     app.use(express.static(clientBuildPath));
     
