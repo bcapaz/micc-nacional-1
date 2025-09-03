@@ -1,0 +1,4 @@
+export function TrendingSidebar() {
+  // Este componente está temporariamente desativado para corrigir o erro de build.
+  return null;
+}

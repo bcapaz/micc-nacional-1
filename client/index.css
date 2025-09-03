@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 215 100% 23%; /* Brazil blue #002776 */
+    --foreground: 0 0% 100%; /* White text */
+
+    --card: 215 100% 16%; /* Darker blue for cards */
+    --card-foreground: 0 0% 100%; /* White text */
+
+    --popover: 215 100% 16%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 215 100% 23%; /* Brazil blue #002776 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 60 100% 50%; /* Brazil yellow #ffdf00 */
+    --secondary-foreground: 215 100% 23%; /* Blue text on yellow */
+
+    --accent: 142 100% 30%; /* Brazil green #009c3b */
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 215 50% 30%;
+    --muted-foreground: 0 0% 80%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 30% 30%;
+    --input: 215 30% 30%;
+    --ring: 215 70% 35%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 215 100% 16%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 142 100% 30%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 30% 25%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 30% 30%;
+    --sidebar-ring: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-[#002776] text-white;
+  }
+}
+
+@layer components {
+  .brazil-green {
+    @apply bg-[#009c3b] text-white;
+  }
+  
+  .brazil-yellow {
+    @apply bg-[#ffdf00] text-[#002776];
+  }
+  
+  .brazil-blue {
+    @apply bg-[#002776] text-white;
+  }
+  
+  .sidebar-active {
+    @apply bg-[#003399]; /* Ligeiramente mais claro que o azul principal */
+  }
+}
