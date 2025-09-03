@@ -27,15 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
   } = useQuery<SelectUser | undefined, Error>({
-    // CORRIGIDO: A rota para obter o utilizador é em /auth/user
-    queryKey: ["/auth/user"],
+    queryKey: ["/user"], // Caminho simplificado
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      // CORRIGIDO: A rota de login é /auth/login
-      const res = await apiRequest("POST", "/auth/login", credentials);
+      // Caminho simplificado
+      const res = await apiRequest("POST", "/login", credentials);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Credenciais inválidas");
@@ -43,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/auth/user"], user);
+      queryClient.setQueryData(["/user"], user);
       toast({
         title: "Login realizado com sucesso",
         description: `Bem-vindo, ${user.name}!`,
@@ -60,8 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      // CORRIGIDO: A rota de registo é /auth/register
-      const res = await apiRequest("POST", "/auth/register", credentials);
+      // Caminho simplificado
+      const res = await apiRequest("POST", "/register", credentials);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Não foi possível criar a conta");
@@ -69,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/auth/user"], user);
+      queryClient.setQueryData(["/user"], user);
       toast({
         title: "Registro realizado com sucesso",
         description: "A sua conta foi criada e você já está logado!",
@@ -86,11 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      // CORRIGIDO: A rota de logout é /auth/logout
-      await apiRequest("POST", "/auth/logout");
+      // Caminho simplificado
+      await apiRequest("POST", "/logout");
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/auth/user"], null);
+      queryClient.setQueryData(["/user"], null);
       toast({
         title: "Sessão encerrada",
         description: "Você foi desconectado com sucesso.",
