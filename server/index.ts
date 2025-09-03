@@ -1,70 +1,55 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import "dotenv/config";
+import express from "express";
+import path from "path";
+import { authRouter } from "./auth";
+import { api } from "./routes";
 
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+async function main() {
+  const app = express();
+  const port = process.env.PORT || 3000;
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  // Middlewares essenciais
+  app.use(express.json({ limit: '5mb' })); // Aumentar o limite para uploads
+  app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+  // Suas rotas da API
+  app.use("/api", api);
+  app.use("/auth", authRouter);
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+  // =================================================================
+  // LÓGICA PARA PRODUÇÃO vs. DESENVOLVIMENTO
+  // =================================================================
+
+  if (process.env.NODE_ENV === "production") {
+    // Em produção, sirva os arquivos estáticos da build do cliente
+    const clientDistPath = path.resolve(process.cwd(), "dist/client");
+    console.log(`[server]: Servindo arquivos estáticos de: ${clientDistPath}`);
+    app.use(express.static(clientDistPath));
+
+    // Para qualquer outra rota que não seja da API, sirva o index.html
+    // Isso é crucial para o roteamento do React (wouter) funcionar em produção
+    app.get("*", (req, res) => {
+      if (req.originalUrl.startsWith("/api") || req.originalUrl.startsWith("/auth")) {
+        return res.status(404).json({ message: "Endpoint não encontrado." });
       }
+      res.sendFile(path.resolve(clientDistPath, "index.html"));
+    });
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
-
-(async () => {
-  const server = await registerRoutes(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // Em desenvolvimento, use o middleware do Vite Dev Server
+    console.log("[server]: Rodando em modo de desenvolvimento com Vite.");
+    const { createServer } = await import("vite");
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+      root: "client",
+    });
+    app.use(vite.middlewares);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  app.listen(port, () => {
+    console.log(`[server]: Servidor rodando em http://localhost:${port}`);
   });
-})();
+}
+
+main();
