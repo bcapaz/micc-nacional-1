@@ -45,65 +45,59 @@ export default function HomePage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col md:flex-row">
-            <Sidebar />
-            
-            <div className="flex-1 md:ml-64">
-                <div className="max-w-4xl mx-auto md:flex">
-                    {/* Coluna Principal do Feed */}
-                    <div className="flex-1">
-                        <header className="sticky top-0 z-10 bg-white border-b border-gray-200 dark:bg-gray-950 dark:border-gray-800">
-                            <div className="px-4 py-3">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Twitter dos Delegados</h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Discuta a greve dos caminhoneiros de 2018</p>
-                            </div>
-                        </header>
-                        
-                        <TweetForm onSuccess={handleSuccess} />
-                        
-                        <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                            {isLoading && (
-                                <div className="flex justify-center py-8">
-                                    <Loader2 className="h-8 w-8 animate-spin text-[#009c3b]" />
-                                </div>
-                            )}
+        <div className="w-full max-w-6xl mx-auto grid grid-cols-12 gap-x-4 pt-4">
+            {/* Coluna Esquerda */}
+            <div className="col-span-3 hidden md:block">
+                 <Sidebar />
+            </div>
 
-                            {isError && (
-                                <div className="p-8 text-center text-red-500">
-                                    Ocorreu um erro ao carregar as publicações.
-                                </div>
-                            )}
+            {/* Coluna Central (Feed) */}
+            <div className="col-span-12 md:col-span-6">
+                <TweetForm onSuccess={handleSuccess} />
+                
+                <div className="mt-4 space-y-4">
+                    {isLoading && (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-facebook-blue" />
+                        </div>
+                    )}
 
-                            {data?.pages.map((page, i) => (
-                                <Fragment key={i}>
-                                    {page.data.map((tweet: TweetWithUser) => (
-                                        <TweetCard key={tweet.id} tweet={tweet} />
-                                    ))}
-                                </Fragment>
+                    {isError && (
+                        <div className="p-8 text-center text-red-500 bg-white rounded-lg shadow">
+                            Ocorreu um erro ao carregar as publicações.
+                        </div>
+                    )}
+
+                    {data?.pages.map((page, i) => (
+                        <Fragment key={i}>
+                            {page.data.map((tweet: TweetWithUser) => (
+                                <TweetCard key={tweet.id} tweet={tweet} />
                             ))}
-                        </div>
-
-                        {/* Seção do Botão "Carregar mais" */}
-                        <div className="p-4 text-center">
-                            {hasNextPage && (
-                                <button
-                                    onClick={() => fetchNextPage()}
-                                    disabled={isFetchingNextPage}
-                                    className="rounded-full bg-sky-500 px-4 py-2 font-bold text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-800"
-                                >
-                                    {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
-                                </button>
-                            )}
-
-                            {!isLoading && !hasNextPage && (
-                                <p className="text-gray-500 dark:text-gray-400">Você chegou ao fim.</p>
-                            )}
-                        </div>
-                    </div>
-                    
-                    {/* A Sidebar da direita deve estar aqui, dentro do layout principal */}
-                    <TrendingSidebar />
+                        </Fragment>
+                    ))}
                 </div>
+
+                {/* Seção do Botão "Carregar mais" */}
+                <div className="py-4 text-center">
+                    {hasNextPage && (
+                        <button
+                            onClick={() => fetchNextPage()}
+                            disabled={isFetchingNextPage}
+                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors"
+                        >
+                            {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+                        </button>
+                    )}
+
+                    {!isLoading && !hasNextPage && (
+                        <p className="text-gray-500">Você chegou ao fim.</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Coluna Direita */}
+            <div className="col-span-3 hidden md:block">
+                <TrendingSidebar />
             </div>
         </div>
     );
