@@ -36,7 +36,7 @@ async function main() {
   app.use("/auth", authRouter);
 
   if (process.env.NODE_ENV === "production") {
-    const clientDistPath = path.resolve(process.cwd(), "dist/client");
+    const clientDistPath = path.resolve(process.cwd(), "client/dist");
     console.log(`[server]: Servindo arquivos estáticos de: ${clientDistPath}`);
     app.use(express.static(clientDistPath));
     app.get("*", (req, res) => {
