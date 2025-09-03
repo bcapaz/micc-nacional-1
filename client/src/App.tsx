@@ -9,6 +9,7 @@ import AuthPage from "@/pages/auth-page";
 import ProfilePage from "@/pages/profile-page";
 import AdminPage from "@/pages/admin-page";
 import { ProtectedRoute } from "./lib/protected-route";
+import { TopBar } from "./components/layout/TopBar";
 
 function Router() {
   return (
@@ -26,7 +27,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
+        {/* TopBar é renderizada aqui para ser persistente em todas as páginas */}
+        <TopBar />
+        {/* Adicionamos um padding-top ao container principal para não ficar atrás da TopBar fixa */}
+        <main className="pt-11">
+            <Router />
+        </main>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
