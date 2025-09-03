@@ -81,8 +81,8 @@ export default function AuthPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white">Twitter dos Delegados</h1>
-            <p className="text-gray-300 mt-2">Site Nacional Mirin</p>
+            <h1 className="text-3xl font-bold text-white">Facebook dos Delegados</h1>
+            <p className="text-gray-300 mt-2">Site Nacional Micc</p>
           </div>
 
           <div className="bg-[#001d5e] rounded-lg shadow-md p-8 text-white">
@@ -224,7 +224,7 @@ export default function AuthPage() {
 
           <p className="mt-8 text-center text-sm text-gray-300">
             <a href="https://sites.google.com/view/sitenacionalmirim/in%C3%ADcio" className="text-[#ffdf00] hover:underline">
-              Voltar ao Site Nacional Mirin
+              Voltar ao Site Nacional Micc
             </a>
           </p>
         </div>
@@ -233,7 +233,7 @@ export default function AuthPage() {
       {/* Hero section */}
       <div className="hidden lg:flex lg:w-1/2 bg-[#009c3b] text-white p-8 items-center justify-center">
         <div className="max-w-md">
-          <h2 className="text-4xl font-bold mb-4">Bem-vindo ao Twitter dos Delegados</h2>
+          <h2 className="text-4xl font-bold mb-4">Bem-vindo ao Facebook dos Delegados</h2>
           <p className="text-xl mb-8">
             Participe das discussões sobre a greve dos caminhoneiros de 2018 como seu personagem designado no Modelo das Nações Unidas.
           </p>
