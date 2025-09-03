@@ -1,19 +1,15 @@
 import "dotenv/config";
 import express from "express";
 import path from "path";
-import { fileURLToPath } from "url"; // Importação necessária para a correção
+import { fileURLToPath } from "url";
 import session from "express-session";
 import passport from "passport";
 import { storage } from "./storage";
 import { auth as authRouter } from "./auth";
 import { routes as api } from "./routes";
 
-// --- INÍCIO DA CORREÇÃO ---
-// Determina o caminho para o diretório atual do ficheiro em execução
-// Isto é mais fiável do que process.cwd() em ambientes de produção
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// --- FIM DA CORREÇÃO ---
 
 async function main() {
   const app = express();
@@ -42,12 +38,12 @@ async function main() {
   app.use("/auth", authRouter);
 
   if (process.env.NODE_ENV === "production") {
-    // CORREÇÃO FINAL: O caminho agora é relativo ao local do ficheiro do servidor
-    const clientBuildPath = path.resolve(__dirname, "../client");
+    // CORREÇÃO FINAL: Aponta para a pasta 'public' DENTRO da pasta 'dist'.
+    // Isto corresponde à configuração 'outDir: ../dist/public' no seu vite.config.ts
+    const clientBuildPath = path.resolve(__dirname, "public");
     console.log(`[server]: Servindo ficheiros estáticos de: ${clientBuildPath}`);
     app.use(express.static(clientBuildPath));
     
-    // Para qualquer outra rota, sirva o index.html principal do cliente.
     app.get("*", (req, res) => {
       res.sendFile(path.resolve(clientBuildPath, "index.html"));
     });
