@@ -1,19 +1,19 @@
 import { db } from "@db";
-import { users, tweets, likes, reposts, type Comment, type Repost } from "@shared/schema";
+import { users, tweets, likes, reposts, type Repost } from "@shared/schema";
 import { eq, and, desc, sql, ne, ilike, lt } from "drizzle-orm";
 import { insertUserSchema } from "@shared/schema";
 import { type InsertUser, type User, type Tweet, type Like, type TweetWithUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { randomBytes } from "crypto";
-import { hashPassword } from "./auth";
+import { hashPassword } from "./utils"; // CORRIGIDO: Importa de utils.ts
 
 export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User>;
-  getAllTweets(currentUserId: number): Promise<TweetWithUser[]>;
+  getAllTweets(currentUserId: number, options?: { limit?: number; cursor?: string }): Promise<TweetWithUser[]>;
   getUserTweets(userId: number, currentUserId: number): Promise<TweetWithUser[]>;
   createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet>;
   getTweetById(id: number): Promise<Tweet | undefined>;
@@ -67,7 +67,6 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // [CORRIGIDO] Apenas uma versão da função, a que aceita 'password'
   async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User> {
     const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
     if (!result[0]) {
@@ -80,7 +79,7 @@ export class DatabaseStorage implements IStorage {
         currentUserId: number,
         options: { limit?: number; cursor?: string } = {}
     ): Promise<TweetWithUser[]> {
-        const { limit = 15, cursor } = options; // Padrão de 15 tweets por página
+        const { limit = 15, cursor } = options; 
 
         const result = await db.select({
             id: tweets.id,
@@ -100,12 +99,11 @@ export class DatabaseStorage implements IStorage {
         .where(
             and(
                 eq(tweets.isComment, false),
-                // Se um cursor (data) for fornecido, busca apenas tweets mais antigos que ele
                 cursor ? lt(tweets.createdAt, new Date(cursor)) : undefined
             )
         )
         .orderBy(desc(tweets.createdAt))
-        .limit(limit); // Aplica o limite para paginação
+        .limit(limit);
 
         return result as unknown as TweetWithUser[];
     }
@@ -189,7 +187,7 @@ export class DatabaseStorage implements IStorage {
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.username);
   }
-  
+ 
   async getNonAdminUsers(): Promise<User[]> {
     return await db.select().from(users).where(eq(users.isAdmin, false)).orderBy(users.username);
   }
@@ -214,7 +212,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: (tweets, { desc }) => [desc(tweets.createdAt)]
     });
-    return result.map(tweet => ({ ...tweet, isLiked: false, likeCount: tweet.likeCount || 0 }));
+    return result.map(tweet => ({ ...tweet, isLiked: false, likeCount: tweet.likeCount || 0 })) as unknown as TweetWithUser[];
   }
 
   async getRepost(userId: number, tweetId: number): Promise<Repost | undefined> {
