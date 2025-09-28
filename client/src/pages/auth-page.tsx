@@ -76,16 +76,18 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#002776] flex">
+ return (
+    // CORRIGIDO: Cor de fundo alterada para o azul claro do Facebook
+    <div className="min-h-screen bg-[#3b5998] flex">
       {/* Login/Registration form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white">Facebook dos Delegados</h1>
-            <p className="text-gray-300 mt-2">Site Nacional Micc</p>
+            <p className="text-gray-200 mt-2">Site Nacional Micc</p>
           </div>
 
-          <div className="bg-[#001d5e] rounded-lg shadow-md p-8 text-white">
+          <div className="bg-[#2a4887] rounded-lg shadow-md p-8 text-white">
             <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid grid-cols-2 mb-6">
                 <TabsTrigger value="login">Login</TabsTrigger>
@@ -122,7 +124,7 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-
+                    
                     <Button 
                       type="submit" 
                       className="w-full bg-[#009c3b] hover:bg-opacity-90"
@@ -235,7 +237,7 @@ export default function AuthPage() {
         <div className="max-w-md">
           <h2 className="text-4xl font-bold mb-4">Bem-vindo ao Facebook dos Delegados</h2>
           <p className="text-xl mb-8">
-            Participe das discussões sobre a greve dos caminhoneiros de 2018 como seu personagem designado no Modelo das Nações Unidas.
+            Participe das discussões sobre a eleição de 2014 entre Dilma e Aécio.
           </p>
           <div className="space-y-4">
             <div className="flex items-center">
