@@ -4,44 +4,36 @@
 
 @layer base {
   :root {
-    --background: 215 100% 23%; /* Brazil blue #002776 */
-    --foreground: 0 0% 100%; /* White text */
+    /* Cores do Facebook 2014 */
+    --background: 220 14% 96%; /* #e9ebee */
+    --foreground: 222 24% 14%; /* #1d2129 */
+    
+    --card: 0 0% 100%; /* white */
+    --card-foreground: 222 24% 14%;
 
-    --card: 215 100% 16%; /* Darker blue for cards */
-    --card-foreground: 0 0% 100%; /* White text */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 24% 14%;
 
-    --popover: 215 100% 16%;
-    --popover-foreground: 0 0% 100%;
-
-    --primary: 215 100% 23%; /* Brazil blue #002776 */
+    --primary: 221 44% 41%; /* #3b5998 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 60 100% 50%; /* Brazil yellow #ffdf00 */
-    --secondary-foreground: 215 100% 23%; /* Blue text on yellow */
+    --secondary: 220 13% 91%; /* Cor de fundo de botões secundários */
+    --secondary-foreground: 222 24% 14%;
 
-    --accent: 142 100% 30%; /* Brazil green #009c3b */
-    --accent-foreground: 0 0% 100%;
+    --muted: 220 13% 91%;
+    --muted-foreground: 220 9% 46%; /* #606770 */
 
-    --muted: 215 50% 30%;
-    --muted-foreground: 0 0% 80%;
+    --accent: 220 13% 91%;
+    --accent-foreground: 222 24% 14%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 30% 30%;
-    --input: 215 30% 30%;
-    --ring: 215 70% 35%;
+    --border: 220 13% 89%; /* #dfe3e8 */
+    --input: 0 0% 100%;
+    --ring: 221 44% 41%;
 
     --radius: 0.5rem;
-
-    --sidebar-background: 215 100% 16%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 142 100% 30%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 30% 25%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 215 30% 30%;
-    --sidebar-ring: 0 0% 100%;
   }
 }
 
