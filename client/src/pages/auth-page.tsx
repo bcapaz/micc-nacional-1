@@ -76,7 +76,6 @@ export default function AuthPage() {
   };
 
   return (
- return (
     // CORRIGIDO: Cor de fundo alterada para o azul claro do Facebook
     <div className="min-h-screen bg-[#3b5998] flex">
       {/* Login/Registration form */}
