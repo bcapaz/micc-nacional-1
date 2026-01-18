@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TweetCard } from "@/components/tweet/tweet-card";
 import { TrendingSidebar } from "@/components/trending/trending-sidebar";
 import { TweetWithUser, User } from "@shared/schema";
-import { Loader2, ArrowLeft, Repeat2 } from "lucide-react";
+import { Loader2, ArrowLeft, Share2 } from "lucide-react"; // Share2 para parecer compartilhamento
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,18 +14,18 @@ import { ProfileEditForm } from "@/components/profile/profile-edit-form";
 function ProfileNotFound() {
   return (
     <div className="flex-1">
-      <header className="sticky top-0 z-10 bg-card border-b border-border">
+      <header className="sticky top-0 z-10 bg-[#3b5998] border-b border-[#29487d] text-white"> {/* Azul clássico FB 2014 */}
         <div className="px-4 py-3 flex items-center">
           <Link href="/" className="mr-6">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <ArrowLeft className="w-5 h-5 text-white" />
           </Link>
           <div>
-            <h2 className="text-xl font-bold text-foreground">Perfil não encontrado</h2>
+            <h2 className="text-xl font-bold">Página não encontrada</h2>
           </div>
         </div>
       </header>
-      <div className="p-6 text-center text-muted-foreground">
-        Este usuário não existe.
+      <div className="p-6 text-center text-muted-foreground bg-white mt-4 border border-[#dfe3ee]">
+        Esta linha do tempo não está disponível.
       </div>
     </div>
   );
@@ -33,34 +33,15 @@ function ProfileNotFound() {
 
 // Componente para o estado de "Erro"
 function ProfileError({ message }: { message: string }) {
-    return <div className="p-8 text-center text-destructive">Ocorreu um erro ao carregar o feed: {message}</div>
+    return <div className="p-8 text-center text-destructive bg-white border border-red-200 mt-4">Erro ao carregar cronologia: {message}</div>
 }
 
 // Componente para o estado de "Carregando"
 function ProfileLoading() {
     return (
         <div className="flex-1">
-            <header className="sticky top-0 z-10 bg-card border-b border-border">
-                <div className="px-4 py-3 flex items-center">
-                    <Link href="/" className="mr-6"><ArrowLeft className="w-5 h-5 text-foreground" /></Link>
-                    <div className="flex flex-col animate-pulse">
-                        <div className="h-6 w-40 bg-muted rounded"></div>
-                        <div className="h-4 w-24 bg-muted rounded mt-1"></div>
-                    </div>
-                </div>
-            </header>
-            <div className="p-6 bg-card border-b border-border">
-                <div className="flex items-center space-x-4 animate-pulse">
-                    <div className="h-20 w-20 rounded-full bg-muted"></div>
-                    <div className="flex-1 space-y-2">
-                        <div className="h-6 w-48 bg-muted rounded"></div>
-                        <div className="h-4 w-32 bg-muted rounded"></div>
-                        <div className="h-4 w-64 bg-muted rounded"></div>
-                    </div>
-                </div>
-            </div>
-            <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+            <div className="flex justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" />
             </div>
         </div>
     );
@@ -68,10 +49,11 @@ function ProfileLoading() {
 
 export default function ProfilePage() {
   const params = useParams();
-  const identifier = params.username;
+  const identifier = params.username; // Pega o nome de usuário da URL
   
   const { user: currentUser } = useAuth();
 
+  // CORREÇÃO: Garante que a query use o caminho absoluto da API
   const { data: profileUser, isLoading: isLoadingProfile, isError: isProfileError, error: profileError } = useQuery<User>({
     queryKey: [`/api/profile/${identifier}`],
     enabled: !!identifier,
@@ -79,80 +61,67 @@ export default function ProfilePage() {
 
   const { data: userTweets, isLoading: isLoadingTweets, isError: isTweetsError, error: tweetsError } = useQuery<TweetWithUser[]>({
     queryKey: [`/api/profile/${identifier}/tweets`],
-    enabled: !!profileUser, // Só busca os tweets depois que o perfil for encontrado
+    enabled: !!profileUser, 
   });
 
   const isOwnProfile = currentUser?.id === profileUser?.id;
 
   const renderContent = () => {
-    if (isLoadingProfile) {
-      return <ProfileLoading />;
-    }
-    
-    if (isProfileError) {
-      return <ProfileError message={profileError instanceof Error ? profileError.message : 'Erro desconhecido'}/>;
-    }
+    if (isLoadingProfile) return <ProfileLoading />;
+    if (isProfileError) return <ProfileError message={profileError instanceof Error ? profileError.message : 'Erro de conexão'}/>;
+    if (!profileUser) return <ProfileNotFound />;
 
-    if (!profileUser) {
-      return <ProfileNotFound />;
-    }
-
-    // Se tudo estiver certo, renderiza o perfil completo
     return (
       <div className="flex-1">
-        <header className="sticky top-0 z-10 bg-card border-b border-border">
-          <div className="px-4 py-3 flex items-center">
-            <Link href="/" className="mr-6">
-              <ArrowLeft className="w-5 h-5 text-foreground" />
-            </Link>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">{profileUser.username}</h2>
-              <p className="text-sm text-muted-foreground">Delegação</p>
+        {/* Header do Perfil estilo 2014 */}
+        <header className="sticky top-0 z-10 bg-white border-b border-[#dfe3ee] mb-4">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center">
+                <Link href="/" className="mr-4 md:hidden"><ArrowLeft className="w-5 h-5" /></Link>
+                <h2 className="text-xl font-bold text-[#3b5998]">{profileUser.name || profileUser.username}</h2>
             </div>
+            {isOwnProfile && <ProfileEditForm />}
           </div>
         </header>
         
-        <div className="p-6 bg-card border-b border-border">
-          <div className="flex items-center space-x-4">
-            <UserAvatar user={profileUser} size="lg" />
-            <div className="flex-1">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">{profileUser.username}</h1>
-                  {profileUser.name && !isOwnProfile && (
-                    <p className="text-muted-foreground text-sm">
-                      Delegação de {profileUser.name}
-                    </p>
-                  )}
-                </div>
-                {isOwnProfile && <ProfileEditForm />}
-              </div>
-              {profileUser.bio && (
-                <p className="text-foreground mt-2">{profileUser.bio}</p>
-              )}
+        {/* Card de Informações do Perfil */}
+        <div className="p-6 bg-white border border-[#dfe3ee] mb-4 shadow-sm">
+          <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
+            <UserAvatar user={profileUser} size="lg" className="h-32 w-32 border-4 border-white shadow-md" />
+            <div className="flex-1 text-center md:text-left">
+                <h1 className="text-3xl font-bold text-[#1d2129]">{profileUser.name}</h1>
+                <p className="text-[#90949c] font-semibold">@{profileUser.username}</p>
+                {profileUser.bio && (
+                    <div className="mt-4 p-3 bg-[#f5f6f7] rounded border border-[#ebedf0] italic text-[#4b4f56]">
+                        "{profileUser.bio}"
+                    </div>
+                )}
             </div>
           </div>
         </div>
         
-        <div className="divide-y divide-border">
+        {/* Feed de Publicações */}
+        <div className="space-y-4">
           {isLoadingTweets ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-accent" /></div>
+            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" /></div>
           ) : isTweetsError ? (
-            <div className="p-8 text-center text-destructive">Ocorreu um erro ao carregar o feed: {tweetsError instanceof Error ? tweetsError.message : 'Erro desconhecido'}</div>
+            <ProfileError message="Erro ao carregar publicações" />
           ) : userTweets && userTweets.length > 0 ? (
             userTweets.map(item => (
-              <div key={`${item.type}-${item.id}`}>
+              <div key={`${item.type}-${item.id}`} className="bg-white border border-[#dfe3ee] shadow-sm overflow-hidden">
                 {item.type === 'repost' && (
-                  <div className="flex items-center text-sm text-muted-foreground pl-12 pt-3 -mb-3">
-                    <Repeat2 className="w-4 h-4 mr-2" />
-                    <span>{item.repostedBy || 'Você'} repostou</span>
+                  <div className="flex items-center text-xs text-[#90949c] px-4 pt-3 font-bold">
+                    <Share2 className="w-3 h-3 mr-2" />
+                    <span>{item.repostedBy || 'Você'} compartilhou uma publicação</span>
                   </div>
                 )}
                 <TweetCard tweet={item} />
               </div>
             ))
           ) : (
-            <div className="p-8 text-center text-muted-foreground">Nenhuma publicação encontrada.</div>
+            <div className="p-8 text-center bg-white border border-[#dfe3ee] text-[#90949c]">
+                Nenhuma atividade recente na linha do tempo.
+            </div>
           )}
         </div>
       </div>
@@ -160,13 +129,15 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      <Sidebar />
-      <div className="flex-1 md:ml-64">
-        <div className="max-w-4xl mx-auto md:flex">
-          {renderContent()}
-          <TrendingSidebar />
-        </div>
+    <div className="min-h-screen bg-[#e9ebee]"> {/* Fundo cinza FB 2014 */}
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row pt-4">
+        <Sidebar />
+        <main className="flex-1 md:ml-64 px-4 pb-10">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {renderContent()}
+            <TrendingSidebar />
+          </div>
+        </main>
       </div>
     </div>
   );
