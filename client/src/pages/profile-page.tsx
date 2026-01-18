@@ -131,16 +131,29 @@ export default function ProfilePage() {
     );
   };
 
-  return (
-    <div className="min-h-screen bg-[#e9ebee] flex justify-center">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row pt-4 gap-4">
-        <Sidebar />
-        <main className="flex-1 px-4 pb-10">
+return (
+    <div className="min-h-screen bg-[#e9ebee] flex justify-center"> {/* Fundo cinza e centralização total */}
+      <div className="w-full max-w-[1012px] flex flex-col md:flex-row pt-4 px-2 gap-4"> {/* Container com largura fixa do FB 2014 */}
+        
+        {/* Coluna da Esquerda (Menu) */}
+        <aside className="w-[180px] flex-shrink-0"> {/* Diminuímos a Sidebar para 180px, como no original */}
+          <Sidebar />
+        </aside>
+
+        {/* Coluna Central e Direita */}
+        <main className="flex-1 min-w-0"> {/* Removemos o md:ml-64 aqui */}
           <div className="flex flex-col lg:flex-row gap-4">
-            {renderContent()}
-            <TrendingSidebar />
+            <section className="flex-1 min-w-0">
+               {renderContent()}
+            </section>
+            
+            {/* Coluna da Direita (Tendências/Sugestões) */}
+            <aside className="w-[300px] flex-shrink-0 hidden lg:block">
+               <TrendingSidebar />
+            </aside>
           </div>
         </main>
+        
       </div>
     </div>
   );
