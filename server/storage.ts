@@ -89,7 +89,7 @@ export class DatabaseStorage implements IStorage {
             createdAt: tweets.createdAt,
             likeCount: tweets.likeCount,
             repostCount: tweets.repostCount,
-            commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
+            commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE comments.parent_id::integer = ${tweets.id}::integer)`.mapWith(Number),
             user: { id: users.id, username: users.username, name: users.name, profileImage: users.profileImage, avatarColor: users.avatarColor },
             isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
             isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
@@ -130,7 +130,7 @@ export class DatabaseStorage implements IStorage {
         id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
         createdAt: tweets.createdAt, repostCount: tweets.repostCount,
         likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id})`.mapWith(Number),
-        commentCount: sql<number>`(SELECT COUNT(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
+        commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE comments.parent_id::integer = ${tweets.id}::integer)`.mapWith(Number),
         isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
         isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
         user: { id: users.id, username: users.username, name: users.name, profileImage: users.profileImage, avatarColor: users.avatarColor },
@@ -147,7 +147,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet> {
-    const [newTweet] = await db.insert(tweets).values(tweet).returning();
+    const [newTweet] = await db.insert(tweets).values({tweet,likeCount:0,repostCount:0}).returning();
     return newTweet;
   }
 
