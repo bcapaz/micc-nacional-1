@@ -23,7 +23,7 @@ export const tweets = pgTable("tweets", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   parentId: integer("parent_id").references(() => tweets.id),
   isComment: boolean("is_comment").default(false),
-  likeCount: integer("like_count").default(0).notNull(),
+  likeCount: integer("like_count").default(0),
   repostCount: integer("repost_count").default(0)
 });
 
