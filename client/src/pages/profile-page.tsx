@@ -132,10 +132,10 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#e9ebee]">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row pt-4">
+    <div className="min-h-screen bg-[#e9ebee] flex justify-center">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row pt-4 gap-4">
         <Sidebar />
-        <main className="flex-1 md:ml-64 px-4 pb-10">
+        <main className="flex-1 px-4 pb-10">
           <div className="flex flex-col lg:flex-row gap-4">
             {renderContent()}
             <TrendingSidebar />
