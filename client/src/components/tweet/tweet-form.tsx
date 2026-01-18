@@ -124,7 +124,7 @@ export function TweetForm({
                 <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    placeholder={`${placeholder}, ${user.username.split(' ')[0]}?`}
+                    placeholder={placeholder}
                     className="w-full bg-transparent border-none focus:ring-0 resize-none text-base placeholder-gray-500"
                     rows={2}
                 />
