@@ -11,7 +11,7 @@ export const users = pgTable("users", {
   bio: text("bio"),
   profileImage: text("profile_image"),
   avatarColor: text("avatar_color").notNull().default("#009c3b"),
-  isAdmin: boolean("is_admin").notNull().default(false),
+  isAdmin: boolean("isAdmin").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 
