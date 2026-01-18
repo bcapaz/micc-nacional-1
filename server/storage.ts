@@ -147,8 +147,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet> {
-    const [newTweet] = await db.insert(tweets).values({tweet,likeCount:0,repostCount:0}).returning();
-    return newTweet;
+  const [newTweet] = await db.insert(tweets).values({
+    ...tweet, // OS TRÊS PONTINHOS SÃO ESSENCIAIS!
+    likeCount: 0,
+    repostCount: 0
+  }).returning();
+  return newTweet;
   }
 
   async getTweetById(id: number): Promise<Tweet | undefined> {
