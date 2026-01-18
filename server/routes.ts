@@ -153,10 +153,10 @@ routes.post("/tweets/:id/like", isAuthenticated, async (req, res) => {
         const userId = req.user.id;
         const existingLike = await storage.getLike(userId, tweetId);
         if (existingLike) {
-            return res.status(409).json({ message: "Tweet já foi curtido por este usuário" });
+            return res.status(409).json({ message: "Publicação já foi curtida por este usuário" });
         }
         await storage.createLike({ userId, tweetId });
-        return res.status(201).json({ message: "Tweet liked successfully" });
+        return res.status(201).json({ message: "Publicação curtida" });
     } catch (error) {
         console.error("Error liking tweet:", error);
         res.status(500).json({ message: "Internal server error" });
@@ -216,10 +216,10 @@ routes.post('/tweets/:id/repost', isAuthenticated, async (req, res) => {
         const userId = req.user.id;
         const existingRepost = await storage.getRepost(userId, tweetId);
         if (existingRepost) {
-            return res.status(409).json({ message: "Tweet já repostado" });
+            return res.status(409).json({ message: "Publicação já repostada" });
         }
         await storage.createRepost(userId, tweetId);
-        return res.status(201).json({ message: "Tweet repostado com sucesso" });
+        return res.status(201).json({ message: "Publicação repostada com sucesso" });
     } catch (error) {
         console.error("Error creating repost:", error);
         return res.status(500).json({ message: "Erro interno do servidor" });
@@ -258,7 +258,7 @@ routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
             return res.status(404).json({ message: "Like não encontrado para este usuário" });
         }
         await storage.deleteLike(userId, tweetId);
-        return res.status(200).json({ message: "Tweet unliked successfully" });
+        return res.status(200).json({ message: "Publicação descurtida" });
     } catch (error) {
         console.error("Error unliking tweet:", error);
         res.status(500).json({ message: "Internal server error" });
