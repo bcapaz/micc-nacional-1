@@ -291,5 +291,23 @@ routes.delete("/admin/tweets/:id", isAuthenticated, isAdmin, async (req, res) =>
         console.error("Error deleting tweet:", error);
         return res.status(500).json({ message: "Erro interno do servidor" });
     }
+
+routes.post("/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        const { isAdmin: newStatus } = req.body;
+
+        // @ts-ignore
+        if (userId === req.user.id) {
+            return res.status(400).json({ message: "Você não pode remover seu próprio admin." });
+        }
+
+        const updatedUser = await storage.updateUser(userId, { isAdmin: newStatus });
+        return res.json(updatedUser);
+    } catch (error) {
+        console.error("Erro ao alterar privilégios:", error);
+        res.status(500).json({ message: "Erro interno do servidor" });
+    }
+});
 });
 
