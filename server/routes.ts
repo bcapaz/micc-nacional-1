@@ -28,6 +28,8 @@ const isAdmin = (req, res, next) => {
 
 
 // --- ROTAS GET ---
+
+// Busca publicações para o feed principal
 routes.get("/tweets", isAuthenticated, async (req, res) => {
   try {
     const limit = 15;
@@ -52,6 +54,7 @@ routes.get("/tweets", isAuthenticated, async (req, res) => {
   }
 });
 
+// Busca informações de um perfil específico
 routes.get("/profile/:identifier", isAuthenticated, async (req, res) => {
     try {
         const identifier = req.params.identifier;
@@ -70,6 +73,7 @@ routes.get("/profile/:identifier", isAuthenticated, async (req, res) => {
     }
 });
 
+// Busca todos os usuários (apenas para Admins)
 routes.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
         const allUsers = await storage.getAllUsers();
@@ -80,6 +84,7 @@ routes.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     }
 });
 
+// Busca publicações de um perfil específico
 routes.get("/profile/:identifier/tweets", isAuthenticated, async (req, res) => {
     try {
         const identifier = req.params.identifier;
@@ -99,6 +104,7 @@ routes.get("/profile/:identifier/tweets", isAuthenticated, async (req, res) => {
     }
 });
 
+// Busca a lista de delegações para a barra lateral
 routes.get("/users/delegates", isAuthenticated, async (req, res) => {
     try {
         const delegates = await storage.getNonAdminUsers();
@@ -109,6 +115,7 @@ routes.get("/users/delegates", isAuthenticated, async (req, res) => {
     }
 });
 
+// Busca comentários de uma publicação
 routes.get('/tweets/:id/comments', isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
@@ -123,6 +130,8 @@ routes.get('/tweets/:id/comments', isAuthenticated, async (req, res) => {
 
 
 // --- ROTAS POST ---
+
+// Criar nova publicação (Post)
 routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res) => {
     try {
         const content = req.body.content || "";
@@ -131,7 +140,8 @@ routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res)
             const b64 = req.file.buffer.toString("base64");
             mediaData = `data:${req.file.mimetype};base64,${b64}`;
         }
-        // Placeholder clássico do FB 2014
+        
+        // Frase clássica do Facebook 2014
         if (!content && !mediaData) return res.status(400).json({ message: "No que você está pensando? Escreva algo ou poste uma foto." });
         
         const newTweet = await storage.createTweet({
@@ -147,6 +157,7 @@ routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res)
     }
 });
 
+// Curtir uma publicação
 routes.post("/tweets/:id/like", isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
@@ -165,6 +176,7 @@ routes.post("/tweets/:id/like", isAuthenticated, async (req, res) => {
     }
 });
 
+// Atualizar informações de perfil (Configurações de Conta)
 routes.post("/profile/update", isAuthenticated, upload.single('profileImage'), async (req, res) => {
     try {
         const { username, bio } = req.body;
@@ -192,6 +204,7 @@ routes.post("/profile/update", isAuthenticated, upload.single('profileImage'), a
     }
 });
 
+// Comentar em uma publicação
 routes.post("/tweets/:id/comments", isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id, 10);
@@ -211,6 +224,7 @@ routes.post("/tweets/:id/comments", isAuthenticated, async (req, res) => {
     }
 });
 
+// Compartilhar (Repost) uma publicação
 routes.post('/tweets/:id/repost', isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
@@ -228,6 +242,7 @@ routes.post('/tweets/:id/repost', isAuthenticated, async (req, res) => {
     }
 });
 
+// Redefinir senha de um usuário (Admin)
 routes.post("/admin/users/:id/reset-password", isAuthenticated, isAdmin, async (req, res) => {
     try {
         const userIdToReset = parseInt(req.params.id, 10);
@@ -244,7 +259,7 @@ routes.post("/admin/users/:id/reset-password", isAuthenticated, isAdmin, async (
     }
 });
 
-// NOVA ROTA: Alterar privilégios de Admin
+// Alterar privilégios de Admin (Novo Botão de Gerenciamento)
 routes.post("/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
@@ -265,6 +280,8 @@ routes.post("/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (re
 
 
 // --- ROTAS DELETE ---
+
+// Remover curtida
 routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
@@ -281,7 +298,8 @@ routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
         res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
- 
+
+// Remover compartilhamento
 routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
@@ -299,6 +317,7 @@ routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
     }
 });
 
+// Deletar publicação (Admin)
 routes.delete("/admin/tweets/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
