@@ -33,7 +33,7 @@ routes.get("/tweets", isAuthenticated, async (req, res) => {
     const limit = 15;
     const cursor = req.query.cursor as string | undefined;
     // @ts-ignore
-    const userId = req.user.id; // req.user está garantido pelo middleware isAuthenticated
+    const userId = req.user.id; 
 
     const tweets = await storage.getAllTweets(userId, { limit, cursor });
 
@@ -61,12 +61,12 @@ routes.get("/profile/:identifier", isAuthenticated, async (req, res) => {
         } else {
             user = await storage.getUserByUsername(identifier);
         }
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
         const { password, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
     } catch (error) {
         console.error("Error fetching user profile:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
 
@@ -89,13 +89,13 @@ routes.get("/profile/:identifier/tweets", isAuthenticated, async (req, res) => {
         } else {
             user = await storage.getUserByUsername(identifier);
         }
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
         // @ts-ignore
         const userTweets = await storage.getUserTweets(user.id, req.user.id);
         return res.json(userTweets);
     } catch (error) {
         console.error("Error fetching user tweets:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
 
@@ -105,7 +105,7 @@ routes.get("/users/delegates", isAuthenticated, async (req, res) => {
         return res.json(delegates);
     } catch (error) {
         console.error("Error fetching delegates:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
 
@@ -131,7 +131,9 @@ routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res)
             const b64 = req.file.buffer.toString("base64");
             mediaData = `data:${req.file.mimetype};base64,${b64}`;
         }
-        if (!content && !mediaData) return res.status(400).json({ message: "Conteúdo ou mídia são obrigatórios" });
+        // Placeholder clássico do FB 2014
+        if (!content && !mediaData) return res.status(400).json({ message: "No que você está pensando? Escreva algo ou poste uma foto." });
+        
         const newTweet = await storage.createTweet({
             content,
             // @ts-ignore
@@ -141,25 +143,25 @@ routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res)
         return res.status(201).json(newTweet);
     } catch (error) {
         console.error("Error creating tweet:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
 
 routes.post("/tweets/:id/like", isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
-        if (isNaN(tweetId)) return res.status(400).json({ message: "Invalid tweet ID" });
+        if (isNaN(tweetId)) return res.status(400).json({ message: "ID inválido" });
         // @ts-ignore
         const userId = req.user.id;
         const existingLike = await storage.getLike(userId, tweetId);
         if (existingLike) {
-            return res.status(409).json({ message: "Publicação já foi curtida por este usuário" });
+            return res.status(409).json({ message: "Você já curtiu esta publicação" });
         }
         await storage.createLike({ userId, tweetId });
-        return res.status(201).json({ message: "Publicação curtida" });
+        return res.status(201).json({ message: "Você curtiu esta publicação" });
     } catch (error) {
         console.error("Error liking tweet:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
 
@@ -171,11 +173,11 @@ routes.post("/profile/update", isAuthenticated, upload.single('profileImage'), a
             const b64 = req.file.buffer.toString("base64");
             profileImage = `data:${req.file.mimetype};base64,${b64}`;
         }
-        if (!username || !username.trim()) return res.status(400).json({ message: "Nome de delegação é obrigatório" });
+        if (!username || !username.trim()) return res.status(400).json({ message: "O nome de perfil é obrigatório" });
         // @ts-ignore
         if (username !== req.user.username) {
             const existingUser = await storage.getUserByUsername(username);
-            if (existingUser) return res.status(400).json({ message: "Nome de delegação já está em uso" });
+            if (existingUser) return res.status(400).json({ message: "Este nome de perfil já está em uso" });
         }
         const updateData: { username: string; bio?: string; profileImage?: string } = { username, bio };
         if (profileImage) {
@@ -193,9 +195,9 @@ routes.post("/profile/update", isAuthenticated, upload.single('profileImage'), a
 routes.post("/tweets/:id/comments", isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id, 10);
-        if (isNaN(tweetId)) return res.status(400).json({ message: "ID de tweet inválido" });
+        if (isNaN(tweetId)) return res.status(400).json({ message: "ID inválido" });
         const { content } = req.body;
-        if (!content || content.length > 280) return res.status(400).json({ message: "Conteúdo do comentário é inválido" });
+        if (!content || content.length > 280) return res.status(400).json({ message: "Comentário inválido" });
         const newComment = await storage.createComment({
             content,
             // @ts-ignore
@@ -216,10 +218,10 @@ routes.post('/tweets/:id/repost', isAuthenticated, async (req, res) => {
         const userId = req.user.id;
         const existingRepost = await storage.getRepost(userId, tweetId);
         if (existingRepost) {
-            return res.status(409).json({ message: "Publicação já repostada" });
+            return res.status(409).json({ message: "Você já compartilhou esta publicação" });
         }
         await storage.createRepost(userId, tweetId);
-        return res.status(201).json({ message: "Publicação repostada com sucesso" });
+        return res.status(201).json({ message: "Publicação compartilhada com sucesso" });
     } catch (error) {
         console.error("Error creating repost:", error);
         return res.status(500).json({ message: "Erro interno do servidor" });
@@ -229,9 +231,6 @@ routes.post('/tweets/:id/repost', isAuthenticated, async (req, res) => {
 routes.post("/admin/users/:id/reset-password", isAuthenticated, isAdmin, async (req, res) => {
     try {
         const userIdToReset = parseInt(req.params.id, 10);
-        if (isNaN(userIdToReset)) {
-            return res.status(400).json({ message: "ID de utilizador inválido." });
-        }
         const { newPassword } = req.body;
         if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
             return res.status(400).json({ message: "A nova senha deve ter pelo menos 6 caracteres."});
@@ -245,53 +244,7 @@ routes.post("/admin/users/:id/reset-password", isAuthenticated, isAdmin, async (
     }
 });
 
-
-// --- ROTAS DELETE ---
-routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
-    try {
-        const tweetId = parseInt(req.params.id);
-        if (isNaN(tweetId)) return res.status(400).json({ message: "Invalid tweet ID" });
-        // @ts-ignore
-        const userId = req.user.id;
-        const existingLike = await storage.getLike(userId, tweetId);
-        if (!existingLike) {
-            return res.status(404).json({ message: "Like não encontrado para este usuário" });
-        }
-        await storage.deleteLike(userId, tweetId);
-        return res.status(200).json({ message: "Publicação descurtida" });
-    } catch (error) {
-        console.error("Error unliking tweet:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-});
- 
-routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
-    try {
-        const tweetId = parseInt(req.params.id);
-        // @ts-ignore
-        const userId = req.user.id;
-        const existingRepost = await storage.getRepost(userId, tweetId);
-        if (!existingRepost) {
-            return res.status(404).json({ message: "Repost não encontrado" });
-        }
-        await storage.deleteRepost(userId, tweetId);
-        return res.status(200).json({ message: "Repost removido com sucesso" });
-    } catch (error) {
-        console.error("Error deleting repost:", error);
-        return res.status(500).json({ message: "Erro interno do servidor" });
-    }
-});
-
-routes.delete("/admin/tweets/:id", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-        const tweetId = parseInt(req.params.id);
-        await storage.deleteTweet(tweetId);
-        return res.status(200).json({ success: true });
-    } catch (error) {
-        console.error("Error deleting tweet:", error);
-        return res.status(500).json({ message: "Erro interno do servidor" });
-    }
-
+// NOVA ROTA: Alterar privilégios de Admin
 routes.post("/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
@@ -309,5 +262,50 @@ routes.post("/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (re
         res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
+
+
+// --- ROTAS DELETE ---
+routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        // @ts-ignore
+        const userId = req.user.id;
+        const existingLike = await storage.getLike(userId, tweetId);
+        if (!existingLike) {
+            return res.status(404).json({ message: "Curtida não encontrada" });
+        }
+        await storage.deleteLike(userId, tweetId);
+        return res.status(200).json({ message: "Publicação descurtida" });
+    } catch (error) {
+        console.error("Error unliking tweet:", error);
+        res.status(500).json({ message: "Erro interno do servidor" });
+    }
+});
+ 
+routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        // @ts-ignore
+        const userId = req.user.id;
+        const existingRepost = await storage.getRepost(userId, tweetId);
+        if (!existingRepost) {
+            return res.status(404).json({ message: "Compartilhamento não encontrado" });
+        }
+        await storage.deleteRepost(userId, tweetId);
+        return res.status(200).json({ message: "Compartilhamento removido" });
+    } catch (error) {
+        console.error("Error deleting repost:", error);
+        return res.status(500).json({ message: "Erro interno do servidor" });
+    }
 });
 
+routes.delete("/admin/tweets/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        await storage.deleteTweet(tweetId);
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Error deleting tweet:", error);
+        return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+});
