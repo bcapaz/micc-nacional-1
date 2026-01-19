@@ -63,7 +63,7 @@ export class DatabaseStorage implements IStorage {
     return await db.query.users.findFirst({ where: ilike(users.username, username) });
   }
 
-  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User> {
+  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string; isAdmin?: boolean }): Promise<User> {
     const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
     if (!result[0]) throw new Error("Utilizador não encontrado.");
     return result[0];
