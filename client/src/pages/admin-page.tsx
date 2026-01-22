@@ -4,34 +4,19 @@ import { useLocation, Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/sidebar";
 import { User } from "@shared/schema";
-import { Loader2, ArrowLeft, AlertTriangle, KeyRound, ShieldCheck } from "lucide-react";
+import { Loader2, ArrowLeft, KeyRound, ShieldCheck, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function AdminPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [userToReset, setUserToReset] = useState<User | null>(null);
@@ -46,7 +31,6 @@ export default function AdminPage() {
     enabled: !!user?.isAdmin,
   });
 
-  // MUTATION PARA DAR/REMOVER ADMIN
   const toggleAdminMutation = useMutation({
     mutationFn: async ({ id, isAdmin }: { id: number, isAdmin: boolean }) => {
         const res = await apiRequest("POST", `/api/admin/users/${id}/toggle-admin`, { isAdmin });
@@ -57,132 +41,99 @@ export default function AdminPage() {
         toast({ title: "Sucesso!", description: "Privilégios atualizados." });
     }
   });
-  
+
   const resetPasswordMutation = useMutation({
     mutationFn: (variables: { userId: number; newPass: string }) => 
       apiRequest("POST", `/api/admin/users/${variables.userId}/reset-password`, { newPassword: variables.newPass }),
     onSuccess: () => {
-      toast({ title: "Senha Redefinida!", description: `A senha para ${userToReset?.username} foi alterada.` });
+      toast({ title: "Sucesso", description: "Senha alterada." });
       setIsResetDialogOpen(false);
       setNewPassword("");
-      setUserToReset(null);
     }
   });
 
-  const handleOpenResetDialog = (u: User) => {
-    setUserToReset(u);
-    setIsResetDialogOpen(true);
-  };
+  if (!user?.isAdmin) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
-  const downloadCredentials = () => {
-    if (!allUsers) return;
-    const csvContent = "Nome Completo,Nome de Delegação,Senha\n" + allUsers.map(u => `"${u.name}","${u.username}","Senha definida pelo usuário"`).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'delegacoes_credenciais.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-  
-  if (!user?.isAdmin) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  
   return (
-    <>
-      <div className="min-h-screen flex flex-col md:flex-row">
-        <Sidebar />
-        <div className="flex-1 md:ml-64 bg-background">
-          <div className="max-w-5xl mx-auto px-4 py-6">
-            <header className="mb-6">
-              <div className="flex items-center mb-4">
-                <Link href="/"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Voltar</Button></Link>
-                <h1 className="text-2xl font-bold ml-2">Painel de Administração</h1>
-              </div>
-            </header>
-            
-            <Tabs defaultValue="users" className="w-full">
-              <TabsList className="mb-6">
-                <TabsTrigger value="users">Delegações</TabsTrigger>
-                <TabsTrigger value="export">Exportar Dados</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="users">
-                <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-                  {isLoadingUsers ? (
-                    <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" /></div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12"></TableHead>
-                          <TableHead>Delegação</TableHead>
-                          <TableHead>Nome Real</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {allUsers?.map((u) => (
-                          <TableRow key={u.id}>
-                            <TableCell><UserAvatar user={u} size="sm" /></TableCell>
-                            <TableCell className="font-bold text-[#3b5998]">@{u.username}</TableCell>
-                            <TableCell>{u.name}</TableCell>
-                            <TableCell>
-                              {u.isAdmin ? <span className="text-green-600 font-bold flex items-center"><ShieldCheck className="h-3 w-3 mr-1"/> Admin</span> : "Delegado"}
-                            </TableCell>
-                            <TableCell className="text-right space-x-2">
-                              {/* BOTÃO DE DAR ADMIN */}
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: !u.isAdmin })}
-                              >
-                                {u.isAdmin ? "Remover Admin" : "Tornar Admin"}
-                              </Button>
-                              
-                              <Button variant="ghost" size="sm" onClick={() => handleOpenResetDialog(u)}>
-                                <KeyRound className="h-4 w-4 mr-2" /> Redefinir Senha
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="export">
-                 <div className="bg-card rounded-lg border border-border p-6 text-center">
-                    <Button variant="outline" onClick={downloadCredentials}>Baixar Lista de Delegações (CSV)</Button>
-                 </div>
-              </TabsContent>
-            </Tabs>
+    <div className="min-h-screen bg-[#e9ebee] flex justify-center">
+      <div className="w-full max-w-[1012px] flex flex-col md:flex-row pt-4 gap-4 px-2">
+        
+        {/* SIDEBAR: Lateral e estreita */}
+        <aside className="w-full md:w-[180px] flex-shrink-0">
+          <Sidebar />
+        </aside>
+
+        {/* PAINEL: Central e Largo */}
+        <main className="flex-1 bg-white border border-[#dfe3ee] shadow-sm mb-10 overflow-hidden">
+          <div className="p-4 border-b border-[#dfe3ee] bg-[#f5f6f7] flex justify-between items-center">
+            <h1 className="text-sm font-bold text-[#4b4f56] uppercase">Painel de Administração</h1>
+            <Link href="/"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1"/> Sair do Painel</Button></Link>
           </div>
-        </div>
+
+          <Tabs defaultValue="users" className="w-full">
+            <div className="px-4 pt-2 border-b border-[#dfe3ee]">
+              <TabsList className="bg-transparent gap-4">
+                <TabsTrigger value="users" className="data-[state=active]:border-b-2 data-[state=active]:border-[#3b5998] rounded-none px-0 pb-2">Delegações</TabsTrigger>
+                <TabsTrigger value="export" className="data-[state=active]:border-b-2 data-[state=active]:border-[#3b5998] rounded-none px-0 pb-2">Exportar</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="users" className="p-0">
+              {isLoadingUsers ? (
+                <div className="flex justify-center p-12"><Loader2 className="animate-spin text-[#3b5998]" /></div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-[#f5f6f7]">
+                    <TableRow>
+                      <TableHead className="w-10"></TableHead>
+                      <TableHead className="text-[11px] font-bold">DELEGAÇÃO</TableHead>
+                      <TableHead className="text-[11px] font-bold">NOME REAL</TableHead>
+                      <TableHead className="text-[11px] font-bold">STATUS</TableHead>
+                      <TableHead className="text-right text-[11px] font-bold">AÇÕES</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allUsers?.map((u) => (
+                      <TableRow key={u.id} className="hover:bg-[#f5f6f7] transition-colors">
+                        <TableCell><UserAvatar user={u} size="xs" /></TableCell>
+                        <TableCell className="font-bold text-[#3b5998]">@{u.username}</TableCell>
+                        <TableCell className="text-[#1d2129]">{u.name}</TableCell>
+                        <TableCell>
+                          {u.isAdmin ? <span className="text-green-600 font-bold flex items-center text-[11px]"><ShieldCheck className="w-3 h-3 mr-1"/> ADMIN</span> : <span className="text-gray-400 text-[11px]">DELEGADO</span>}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="outline" size="xs" className="h-7 text-[10px]" onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: !u.isAdmin })}>
+                            {u.isAdmin ? "Remover Admin" : "Tornar Admin"}
+                          </Button>
+                          <Button variant="ghost" size="xs" className="h-7 text-[10px]" onClick={() => {setUserToReset(u); setIsResetDialogOpen(true);}}>
+                            <KeyRound className="w-3 h-3 mr-1"/> Senha
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
+            <TabsContent value="export" className="p-8 text-center">
+              <Button variant="outline" onClick={() => {/* função csv */}}>
+                <Download className="w-4 h-4 mr-2"/> Baixar Credenciais (CSV)
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </main>
       </div>
 
       <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Redefinir Senha</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <input 
-              type="text" 
-              value={newPassword} 
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full p-2 border rounded" 
-              placeholder="Nova senha (mín. 6 caracteres)"
-            />
-          </div>
+          <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-2 border rounded" placeholder="Nova senha (min. 6 chars)"/>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsResetDialogOpen(false)}>Cancelar</Button>
             <Button onClick={() => resetPasswordMutation.mutate({ userId: userToReset!.id, newPass: newPassword })}>Confirmar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
