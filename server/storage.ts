@@ -67,7 +67,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
     if (!result[0]) throw new Error("Utilizador não encontrado.");
     return result[0];
-  }
+  } //
 
   async getAllTweets(currentUserId: number, options: { limit?: number; cursor?: string } = {}): Promise<TweetWithUser[]> {
     const { limit = 15, cursor } = options; 
