@@ -11,13 +11,12 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { TweetWithUser } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
-// Interface para a resposta paginada
 interface TweetsResponse {
   data: TweetWithUser[];
   nextCursor: string | null;
 }
 
-// --- SUB-COMPONENTE: CAIXA DE POSTAGEM (Integrado) ---
+// --- CAIXA DE POSTAGEM ---
 function CreateTweetBox() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -30,6 +29,7 @@ function CreateTweetBox() {
 
   const createTweetMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      // POST para a API
       const res = await apiRequest("POST", "/api/tweets", formData);
       return res.json();
     },
@@ -38,6 +38,7 @@ function CreateTweetBox() {
       setSelectedImage(null);
       setPreviewUrl(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      // Força a atualização da lista
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
       toast({ title: "Publicado!", description: "Sua publicação foi enviada." });
     },
@@ -67,9 +68,18 @@ function CreateTweetBox() {
 
   const handleSubmit = () => {
     if (!content.trim() && !selectedImage) return;
+
     const formData = new FormData();
     formData.append("content", content);
-    if (selectedImage) formData.append("media", selectedImage);
+    
+    // AQUI ESTÁ A CORREÇÃO SOLICITADA:
+    // Forçamos explicitamente que NÃO é um comentário
+    formData.append("isComment", "false"); 
+
+    if (selectedImage) {
+      formData.append("media", selectedImage);
+    }
+
     createTweetMutation.mutate(formData);
   };
 
@@ -148,7 +158,6 @@ export default function HomePage() {
         </aside>
 
         <main className="flex-1 min-w-0">
-          {/* Componente Integrado aqui */}
           <CreateTweetBox />
 
           <div className="space-y-3 mb-8">
