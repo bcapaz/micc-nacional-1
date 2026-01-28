@@ -4,7 +4,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { TweetCard } from "@/components/tweet/tweet-card";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Loader2, ChevronDown, ImageIcon, X } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient"; // Mantemos para o GET, mas não para o POST
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -29,8 +29,19 @@ function CreateTweetBox() {
 
   const createTweetMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // POST para a API
-      const res = await apiRequest("POST", "/api/tweets", formData);
+      // 🚨 CORREÇÃO AQUI: Usamos fetch direto em vez de apiRequest
+      // Isso permite que o navegador configure o multipart/form-data corretamente
+      const res = await fetch("/api/tweets", {
+        method: "POST",
+        body: formData,
+        // NÃO definimos headers aqui. O navegador faz isso sozinho para FormData.
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Falha ao publicar");
+      }
+      
       return res.json();
     },
     onSuccess: () => {
@@ -38,11 +49,11 @@ function CreateTweetBox() {
       setSelectedImage(null);
       setPreviewUrl(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      // Força a atualização da lista
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
       toast({ title: "Publicado!", description: "Sua publicação foi enviada." });
     },
-    onError: () => {
+    onError: (e) => {
+      console.error(e);
       toast({ title: "Erro", description: "Falha ao publicar.", variant: "destructive" });
     }
   });
@@ -71,10 +82,7 @@ function CreateTweetBox() {
 
     const formData = new FormData();
     formData.append("content", content);
-    
-    // AQUI ESTÁ A CORREÇÃO SOLICITADA:
-    // Forçamos explicitamente que NÃO é um comentário
-    formData.append("isComment", "false"); 
+    formData.append("isComment", "false"); // Garantia extra
 
     if (selectedImage) {
       formData.append("media", selectedImage);
