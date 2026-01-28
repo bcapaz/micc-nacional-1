@@ -318,13 +318,34 @@ routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
 });
 
 // Deletar publicação (Admin)
-routes.delete("/admin/tweets/:id", isAuthenticated, isAdmin, async (req, res) => {
+// --- ROTA DE DELETE UNIVERSAL (Admin ou Dono) ---
+routes.delete("/tweets/:id", isAuthenticated, async (req, res) => {
     try {
         const tweetId = parseInt(req.params.id);
+        
+        // 1. Buscamos o tweet para saber quem é o dono
+        const tweet = await storage.getTweetById(tweetId);
+        
+        if (!tweet) {
+            return res.status(404).json({ message: "Publicação não encontrada" });
+        }
+
+        // @ts-ignore
+        const currentUser = req.user;
+
+        // 2. A REGRA DE OURO:
+        // Se o usuário NÃO for Admin E NÃO for o dono do tweet, bloqueia.
+        if (!currentUser.isAdmin && tweet.userId !== currentUser.id) {
+            return res.status(403).json({ message: "Você não tem permissão para excluir esta publicação." });
+        }
+
+        // 3. Se passou, deleta
+        console.log(`[DELETE] Usuário ${currentUser.username} deletando tweet ${tweetId}`);
         await storage.deleteTweet(tweetId);
+        
         return res.status(200).json({ success: true });
     } catch (error) {
-        console.error("Error deleting tweet:", error);
+        console.error("Erro ao deletar tweet:", error);
         return res.status(500).json({ message: "Erro interno do servidor" });
     }
 });
