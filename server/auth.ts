@@ -9,8 +9,7 @@ import session from "express-session";
 
 const scryptAsync = promisify(scrypt);
 
-// --- FUNÇÕES DE CRIPTOGRAFIA (Usadas aqui e no routes.ts) ---
-
+// Função de Hash (usada também para resetar senha no admin)
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -24,22 +23,19 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
 }
 
-// --- CONFIGURAÇÃO PRINCIPAL DE AUTH ---
-
 export function setupAuth(app: Express) {
-  // 1. Configuração da Sessão
+  // 1. Configura a Sessão
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "segredo_padrao_muito_seguro",
+    secret: process.env.SESSION_SECRET || "segredo_super_secreto",
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
-      secure: app.get("env") === "production", // Secure em produção (https)
-    },
+        secure: app.get("env") === "production",
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
+    }
   };
 
-  // Necessário para cookies seguros no Render (que usa proxy)
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
   }
@@ -48,7 +44,7 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // 2. Estratégia de Login (Username + Password)
+  // 2. Define como verificar o Login
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -64,9 +60,7 @@ export function setupAuth(app: Express) {
     })
   );
 
-  // 3. Serialização (Salvar ID na sessão)
   passport.serializeUser((user, done) => done(null, (user as User).id));
-  
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
@@ -76,27 +70,24 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // --- ROTAS DE AUTENTICAÇÃO ---
-
+  // 3. AS ROTAS OBRIGATÓRIAS (Se faltar isso, dá erro DOCTYPE)
+  
   app.post("/api/register", async (req, res, next) => {
     try {
       const existingUser = await storage.getUserByUsername(req.body.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Nome de usuário já existe" });
-      }
+      if (existingUser) return res.status(400).json({ message: "Usuário já existe" });
 
       const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({
-        ...req.body,
-        password: hashedPassword,
-        isAdmin: false // Padrão
+      const user = await storage.createUser({ 
+          ...req.body, 
+          password: hashedPassword,
+          isAdmin: false 
       });
 
       req.login(user, (err) => {
         if (err) return next(err);
-        // Remove a senha antes de enviar pro front
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        const { password, ...u } = user;
+        res.status(201).json(u);
       });
     } catch (error) {
       next(error);
@@ -104,16 +95,15 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-      passport.authenticate("local", (err: any, user: any, info: any) => {
-          if (err) return next(err);
-          if (!user) return res.status(400).json({ message: "Usuário ou senha inválidos" });
-          
-          req.login(user, (err) => {
-              if (err) return next(err);
-              const { password, ...userWithoutPassword } = user;
-              res.status(200).json(userWithoutPassword);
-          });
-      })(req, res, next);
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return next(err);
+      if (!user) return res.status(400).json({ message: "Login falhou" });
+      req.login(user, (err) => {
+        if (err) return next(err);
+        const { password, ...u } = user;
+        res.status(200).json(u);
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -126,7 +116,7 @@ export function setupAuth(app: Express) {
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     // @ts-ignore
-    const { password, ...userWithoutPassword } = req.user as User;
-    res.json(userWithoutPassword);
+    const { password, ...u } = req.user as User;
+    res.json(u);
   });
 }
