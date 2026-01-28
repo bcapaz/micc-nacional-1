@@ -31,7 +31,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       // Chama a rota de admin para deletar
-      await apiRequest("DELETE", `/api/admin/tweets/${tweet.id}`);
+      await apiRequest("delete", `/api/admin/tweets/${tweet.id}`);
     },
     onSuccess: () => {
       // CORREÇÃO: As chaves agora incluem "/api" para bater com o useQuery do Home e Profile
