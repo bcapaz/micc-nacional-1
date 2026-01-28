@@ -31,7 +31,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       // MUDANÇA: Agora chama a rota comum, sem "/admin"
-      await apiRequest("delete", `/api/tweets/${tweet.id}`);
+      await apiRequest("DELETE", `/api/tweets/${tweet.id}`);
     },
     onSuccess: () => {
       // Mantém os invalidateQueries para atualizar a tela
