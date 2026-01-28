@@ -7,18 +7,15 @@ export const routes = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ====================================================================
-// 🛠️ CORRETOR AUTOMÁTICO DE URL (O SALVADOR)
+// 🛠️ CORRETOR AUTOMÁTICO DE URL
 // ====================================================================
 routes.use((req, res, next) => {
-    // Se a rota chegar como /api/tweets/..., removemos o /api extra
+    // Garante que /api/tweets vire /tweets para o roteador entender
     if (req.url.startsWith('/api/')) {
-        const original = req.url;
         req.url = req.url.replace('/api', '');
-        console.log(`🔧 [AUTO-FIX] URL corrigida: ${original} -> ${req.url}`);
     }
     next();
 });
-// ====================================================================
 
 const isAuthenticated = (req, res, next) => {
   if (!req.isAuthenticated()) return res.status(401).json({ message: "Login necessário" });
@@ -31,16 +28,14 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-// --- ROTAS (Agora vão funcionar mesmo com URL errada) ---
+// --- ROTAS GET ---
 
 routes.get("/tweets", isAuthenticated, async (req, res) => {
   try {
     const cursor = req.query.cursor as string | undefined;
     // @ts-ignore
     const userId = req.user.id; 
-    
-    // OTIMIZAÇÃO: Carrega apenas 5 tweets por vez para economizar dados do DB
-    const limit = 5; 
+    const limit = 5; // Paginação de 5 em 5
 
     const tweets = await storage.getAllTweets(userId, { limit, cursor });
     
@@ -49,10 +44,7 @@ routes.get("/tweets", isAuthenticated, async (req, res) => {
       nextCursor = tweets[tweets.length - 1].createdAt.toISOString();
     }
 
-    return res.json({ 
-        data: tweets,
-        nextCursor 
-    });
+    return res.json({ data: tweets, nextCursor });
   } catch (error) {
     console.error("Error fetching tweets:", error);
     res.status(500).json({ message: "Erro interno" });
@@ -105,20 +97,38 @@ routes.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     return res.json(allUsers);
 });
 
-// --- POSTS ---
+// --- POSTS (CORRIGIDO AQUI) ---
 
 routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res) => {
     try {
+        console.log("📝 [POST TWEET] Recebendo requisição...");
         const content = req.body.content || "";
         let mediaData = null;
-        if (req.file) mediaData = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        if (req.file) {
+            mediaData = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        }
         
-        if (!content && !mediaData) return res.status(400).json({ message: "Vazio" });
+        if (!content && !mediaData) {
+            console.log("❌ [POST TWEET] Conteúdo vazio");
+            return res.status(400).json({ message: "Vazio" });
+        }
         
+        // CORREÇÃO CRÍTICA: Passamos isComment: false explicitamente
         // @ts-ignore
-        const newTweet = await storage.createTweet({ content, userId: req.user.id, mediaData });
+        const newTweet = await storage.createTweet({ 
+            content, 
+            userId: req.user.id, 
+            mediaData,
+            isComment: false, // Importante para o banco saber que é um post principal
+            parentId: null    // Importante para não vincular a nada
+        });
+
+        console.log(`✅ [POST TWEET] Criado com sucesso: ID ${newTweet.id}`);
         return res.status(201).json(newTweet);
-    } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
+    } catch (e) { 
+        console.error("❌ [POST TWEET ERROR]", e); 
+        res.status(500).json({ message: "Erro ao criar publicação" }); 
+    }
 });
 
 routes.post("/tweets/:id/like", isAuthenticated, async (req, res) => {
@@ -204,11 +214,9 @@ routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
     } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
 });
 
-// ROTA DELETE UNIFICADA (Com diagnóstico)
+// ROTA DELETE UNIFICADA
 routes.delete("/tweets/:id", isAuthenticated, async (req, res) => {
     const tweetId = parseInt(req.params.id);
-    console.log(`🗑️ [DELETE] Recebido para ID ${tweetId}`);
-
     try {
         const tweet = await storage.getTweetById(tweetId);
         if (!tweet) return res.status(404).json({ message: "Não encontrado" });
@@ -220,7 +228,6 @@ routes.delete("/tweets/:id", isAuthenticated, async (req, res) => {
         }
 
         await storage.deleteTweet(tweetId);
-        console.log(`✅ [DELETE] Sucesso para ID ${tweetId}`);
         return res.status(200).json({ success: true });
     } catch (error) {
         console.error("❌ [DELETE ERROR]", error);
