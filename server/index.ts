@@ -35,7 +35,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Correção de rotas duplas
+// Rotas
 app.use("/api", routes);
 app.use(routes);
 
@@ -49,22 +49,35 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 (async () => {
   const server = createServer(app);
-  const isDev = app.get("env") === "development";
+  const PORT = Number(process.env.PORT) || 5000;
 
-  // CORREÇÃO DO ERRO DO VITE: Importação Dinâmica
-  // Só carrega o arquivo ./vite se estiver em desenvolvimento
-  if (isDev) {
-    const vite = await import("./vite");
-    await vite.setupVite(app, server);
+  // OTIMIZAÇÃO DE DEPLOY:
+  // Usamos process.env.NODE_ENV para que o 'esbuild' consiga remover
+  // o código do Vite completamente na versão de produção (Dead Code Elimination).
+  if (process.env.NODE_ENV !== "production") {
+    // Código de Desenvolvimento (só carrega localmente)
+    try {
+        const vite = await import("./vite");
+        await vite.setupVite(app, server);
+    } catch (e) {
+        console.log("Vite não carregado (provavelmente produção):", e);
+    }
   } else {
-    // Em produção, usa apenas o serveStatic
-    const vite = await import("./vite");
-    vite.serveStatic(app);
+    // Código de Produção (Leve e Rápido)
+    // Não importamos o arquivo ./vite aqui para evitar dependências pesadas
+    const path = await import("path");
+    const { fileURLToPath } = await import("url");
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    
+    // Serve os arquivos estáticos compilados
+    app.use(express.static(path.join(__dirname, "public")));
+    app.use("*", (_req, res) => {
+      res.sendFile(path.join(__dirname, "public", "index.html"));
+    });
   }
 
-  const PORT = Number(process.env.PORT) || 5000;
-  
-  // Mantendo a porta aberta para o Render (0.0.0.0)
+  // Bind no IP público (0.0.0.0) obrigatório para o Render
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`[server]: Servidor rodando publicamente em http://0.0.0.0:${PORT}`);
   });
