@@ -9,7 +9,6 @@ import session from "express-session";
 
 const scryptAsync = promisify(scrypt);
 
-// Função de Hash (usada também para resetar senha no admin)
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -24,15 +23,16 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
-  // 1. Configura a Sessão
+  console.log("🔒 [AUTH] Configurando sessão e passport...");
+
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "segredo_super_secreto",
+    secret: process.env.SESSION_SECRET || "segredo_padrao",
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
-        secure: app.get("env") === "production",
-        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      secure: app.get("env") === "production"
     }
   };
 
@@ -44,7 +44,6 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // 2. Define como verificar o Login
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -70,36 +69,38 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // 3. AS ROTAS OBRIGATÓRIAS (Se faltar isso, dá erro DOCTYPE)
-  
+  // --- REGISTRO EXPLÍCITO DAS ROTAS DE LOGIN ---
+  console.log("🔒 [AUTH] Registrando rotas: /api/login, /api/register, /api/user");
+
   app.post("/api/register", async (req, res, next) => {
     try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
-      if (existingUser) return res.status(400).json({ message: "Usuário já existe" });
-
+      if (await storage.getUserByUsername(req.body.username)) {
+        return res.status(400).json({ message: "Usuário existe" });
+      }
       const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({ 
-          ...req.body, 
-          password: hashedPassword,
-          isAdmin: false 
-      });
-
+      const user = await storage.createUser({ ...req.body, password: hashedPassword, isAdmin: false });
       req.login(user, (err) => {
         if (err) return next(err);
         const { password, ...u } = user;
         res.status(201).json(u);
       });
-    } catch (error) {
-      next(error);
-    }
+    } catch (error) { next(error); }
   });
 
   app.post("/api/login", (req, res, next) => {
+    console.log(`🔑 [LOGIN ATTEMPT] Usuário tentando: ${req.body.username}`);
     passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) return next(err);
-      if (!user) return res.status(400).json({ message: "Login falhou" });
+      if (err) {
+          console.error("Erro no passport:", err);
+          return next(err);
+      }
+      if (!user) {
+          console.log("Falha: Senha ou usuário incorretos");
+          return res.status(400).json({ message: "Falha no login" });
+      }
       req.login(user, (err) => {
         if (err) return next(err);
+        console.log("Sucesso: Usuário logado!");
         const { password, ...u } = user;
         res.status(200).json(u);
       });
