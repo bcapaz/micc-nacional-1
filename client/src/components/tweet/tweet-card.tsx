@@ -28,16 +28,16 @@ export function TweetCard({ tweet }: TweetCardProps) {
   const [isCommenting, setIsCommenting] = useState(false);
   const [commentText, setCommentText] = useState("");
 
-  // MUTATION DE DELETE CORRIGIDA
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      // Chama a rota de admin para deletar
       await apiRequest("DELETE", `/api/admin/tweets/${tweet.id}`);
     },
     onSuccess: () => {
-      // ESTA É A PARTE MÁGICA QUE FAZ O POST SUMIR DA TELA
-      queryClient.invalidateQueries({ queryKey: ["/tweets"] }); // Atualiza Feed
-      queryClient.invalidateQueries({ queryKey: [`/api/profile/${user?.username}/tweets`] }); // Atualiza Perfil
-      queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] }); 
+      // CORREÇÃO: As chaves agora incluem "/api" para bater com o useQuery do Home e Profile
+      queryClient.invalidateQueries({ queryKey: ["/api/tweets"] }); 
+      queryClient.invalidateQueries({ queryKey: [`/api/profile/${user?.username}/tweets`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
       
       toast({ title: "Sucesso", description: "Publicação excluída com sucesso." });
     },
@@ -55,7 +55,8 @@ export function TweetCard({ tweet }: TweetCardProps) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/tweets"] });
+      // Atualiza o feed e o perfil para mostrar o like novo
+      queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
     }
   });
@@ -69,7 +70,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
           }
       },
       onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["/tweets"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
           queryClient.invalidateQueries({ queryKey: [`/api/profile/${user?.username}/tweets`] });
           toast({ title: "Sucesso", description: tweet.isReposted ? "Compartilhamento removido" : "Publicação compartilhada" });
       }
@@ -80,7 +81,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
           await apiRequest("POST", `/api/tweets/${tweet.id}/comments`, { content: commentText });
       },
       onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["/tweets"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
           setIsCommenting(false);
           setCommentText("");
           toast({ title: "Comentário enviado" });
@@ -103,18 +104,18 @@ export function TweetCard({ tweet }: TweetCardProps) {
                   {tweet.user.name}
                 </a>
               </Link>
-              {tweet.user.isAdmin && <ShieldAlert className="w-3 h-3 text-red-500" />}
+              {tweet.user.isAdmin && <ShieldAlert className="w-3 h-3 text-green-600" title="Administrador" />}
             </div>
             <div className="flex items-center space-x-2">
                 <span className="text-xs text-[#90949c]">
                 {formatDistanceToNow(new Date(tweet.createdAt), { addSuffix: true, locale: ptBR })}
                 </span>
                 
-                {/* BOTÃO DE DELETAR (Apenas para Admins) */}
+                {/* BOTÃO DE DELETAR (Apenas Admin vê isso) */}
                 {user?.isAdmin && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-6 w-6 p-0 text-gray-400">
+                            <Button variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:bg-gray-100 rounded-full">
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -132,7 +133,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
             </div>
           </div>
           
-          <p className="mt-1 text-[14px] text-[#1d2129] whitespace-pre-wrap leading-snug">
+          <p className="mt-1 text-[14px] text-[#1d2129] whitespace-pre-wrap leading-snug break-words">
             {tweet.content}
           </p>
           
@@ -174,18 +175,17 @@ export function TweetCard({ tweet }: TweetCardProps) {
             </Button>
           </div>
 
-          {/* Área de Comentário */}
           {isCommenting && (
               <div className="mt-3 flex gap-2">
                   <Textarea 
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
                       placeholder="Escreva um comentário..."
-                      className="min-h-[40px] text-sm bg-[#f0f2f5] border-none focus-visible:ring-1"
+                      className="min-h-[32px] text-sm bg-[#f0f2f5] border-none focus-visible:ring-1 resize-none py-2"
                   />
                   <Button 
                     size="sm" 
-                    className="bg-[#3b5998] h-10"
+                    className="bg-[#3b5998] h-auto py-2"
                     onClick={() => commentMutation.mutate()}
                     disabled={!commentText.trim() || commentMutation.isPending}
                   >
