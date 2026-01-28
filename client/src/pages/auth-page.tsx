@@ -38,36 +38,22 @@ export default function AuthPage() {
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-    },
+    defaultValues: { username: "", password: "" },
   });
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-      name: "",
-    },
+    defaultValues: { username: "", password: "", name: "" },
   });
 
   useEffect(() => {
-    if (user) {
-      navigate("/");
-    }
+    if (user) navigate("/");
   }, [user, navigate]);
 
-  const onLoginSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate(data);
-  };
+  const onLoginSubmit = (data: LoginFormValues) => loginMutation.mutate(data);
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
-    registerMutation.mutate({
-      ...data,
-      avatarColor: getRandomColor(),
-    });
+    registerMutation.mutate({ ...data, avatarColor: getRandomColor() });
   };
 
   const getRandomColor = () => {
@@ -76,21 +62,19 @@ export default function AuthPage() {
   };
 
   return (
-    // CORRIGIDO: Cor de fundo alterada para o azul claro do Facebook
     <div className="min-h-screen bg-[#3b5998] flex">
-      {/* Login/Registration form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white">Facebook dos Delegados</h1>
-            <p className="text-gray-200 mt-2">Site Nacional Micc</p>
+            <p className="text-gray-200 mt-2 font-semibold">SITE NACIONAL MICC</p>
           </div>
 
-          <div className="bg-[#2a4887] rounded-lg shadow-md p-8 text-white">
+          <div className="bg-[#f0f2f5] rounded-lg shadow-xl p-8 border border-white/20">
             <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2 mb-6">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="register">Registro</TabsTrigger>
+              <TabsList className="grid grid-cols-2 mb-6 bg-gray-200">
+                <TabsTrigger value="login" className="data-[state=active]:bg-[#3b5998] data-[state=active]:text-white">Login</TabsTrigger>
+                <TabsTrigger value="register" className="data-[state=active]:bg-[#009c3b] data-[state=active]:text-white">Registro</TabsTrigger>
               </TabsList>
 
               <TabsContent value="login">
@@ -101,55 +85,41 @@ export default function AuthPage() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome de Delegação</FormLabel>
+                          <FormLabel className="text-[#1c1e21] font-bold">Nome de Delegação</FormLabel>
                           <FormControl>
-                            <Input placeholder="Seu nome de delegação" {...field} />
+                            <Input placeholder="Seu nome de delegação" className="bg-white text-black" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={loginForm.control}
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Senha</FormLabel>
+                          <FormLabel className="text-[#1c1e21] font-bold">Senha</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Sua senha" {...field} />
+                            <Input type="password" placeholder="Sua senha" className="bg-white text-black" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    
                     <Button 
                       type="submit" 
-                      className="w-full bg-[#009c3b] hover:bg-opacity-90"
+                      className="w-full bg-[#3b5998] hover:bg-[#2d4373] text-white font-bold h-12 text-lg"
                       disabled={loginMutation.isPending}
                     >
-                      {loginMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
+                      {loginMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                       Entrar
                     </Button>
                   </form>
                 </Form>
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-300">
-                    Não tem uma conta?{" "}
-                    <button 
-                      className="text-[#ffdf00] hover:underline"
-                      onClick={() => setActiveTab("register")}
-                    >
-                      Registre-se
-                    </button>
-                  </p>
-                </div>
               </TabsContent>
 
               <TabsContent value="register">
+                {/* Mesma lógica aplicada ao formulário de registro */}
                 <Form {...registerForm}>
                   <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
                     <FormField
@@ -157,113 +127,72 @@ export default function AuthPage() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome de Delegação</FormLabel>
+                          <FormLabel className="text-[#1c1e21] font-bold">Nome de Delegação</FormLabel>
                           <FormControl>
-                            <Input placeholder="Escolha um nome de delegação" {...field} />
+                            <Input placeholder="Ex: @DelegadoBR" className="bg-white text-black" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={registerForm.control}
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Senha</FormLabel>
+                          <FormLabel className="text-[#1c1e21] font-bold">Senha</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Escolha uma senha" {...field} />
+                            <Input type="password" placeholder="Mínimo 6 caracteres" className="bg-white text-black" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={registerForm.control}
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome Completo</FormLabel>
+                          <FormLabel className="text-[#1c1e21] font-bold">Nome Completo</FormLabel>
                           <FormControl>
-                            <Input placeholder="Seu nome completo" {...field} />
+                            <Input placeholder="Seu nome real" className="bg-white text-black" {...field} />
                           </FormControl>
-                          <FormMessage className="text-xs">
-                            Este nome não será exibido publicamente, apenas seu Nome de Delegação
-                          </FormMessage>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     <Button 
                       type="submit" 
-                      className="w-full bg-[#009c3b] hover:bg-opacity-90"
+                      className="w-full bg-[#009c3b] hover:bg-[#007b2e] text-white font-bold h-12 text-lg"
                       disabled={registerMutation.isPending}
                     >
-                      {registerMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      Registrar
+                      {registerMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      Criar Conta
                     </Button>
                   </form>
                 </Form>
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-300">
-                    Já tem uma conta?{" "}
-                    <button 
-                      className="text-[#ffdf00] hover:underline"
-                      onClick={() => setActiveTab("login")}
-                    >
-                      Faça login
-                    </button>
-                  </p>
-                </div>
               </TabsContent>
             </Tabs>
           </div>
-
-          <p className="mt-8 text-center text-sm text-gray-300">
-            <a href="https://sites.google.com/view/sitenacionalmirim/in%C3%ADcio" className="text-[#ffdf00] hover:underline">
-              Voltar ao Site Nacional Micc
-            </a>
-          </p>
         </div>
       </div>
 
-      {/* Hero section */}
       <div className="hidden lg:flex lg:w-1/2 bg-[#009c3b] text-white p-8 items-center justify-center">
         <div className="max-w-md">
-          <h2 className="text-4xl font-bold mb-4">Bem-vindo ao Facebook dos Delegados</h2>
-          <p className="text-xl mb-8">
-            Participe das discussões sobre a eleição de 2014 entre Dilma e Aécio.
+          <h2 className="text-5xl font-extrabold mb-6 leading-tight">Brasil Unido em 2014</h2>
+          <p className="text-2xl mb-8 opacity-90">
+            Acompanhe a disputa eleitoral entre Dilma e Aécio como um verdadeiro diplomata.
           </p>
-          <div className="space-y-4">
-            <div className="flex items-center">
-              <div className="rounded-full bg-[#ffdf00] p-2 mr-4 text-[#002776]">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p>Poste como seu personagem designado</p>
-            </div>
-            <div className="flex items-center">
-              <div className="rounded-full bg-[#ffdf00] p-2 mr-4 text-[#002776]">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p>Interaja com outros delegados</p>
-            </div>
-            <div className="flex items-center">
-              <div className="rounded-full bg-[#ffdf00] p-2 mr-4 text-[#002776]">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p>Influencie o resultado do modelo com suas publicações</p>
-            </div>
-          </div>
+          <ul className="space-y-6">
+            <li className="flex items-center text-lg">
+              <div className="bg-[#ffdf00] rounded-full p-2 mr-4"><Loader2 className="w-5 h-5 text-[#002776]"/></div>
+              Poste como sua delegação designada
+            </li>
+            <li className="flex items-center text-lg">
+              <div className="bg-[#ffdf00] rounded-full p-2 mr-4"><Loader2 className="w-5 h-5 text-[#002776]"/></div>
+              Debata o futuro do país no modelo
+            </li>
+          </ul>
         </div>
       </div>
     </div>
