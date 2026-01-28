@@ -35,10 +35,24 @@ const isAdmin = (req, res, next) => {
 
 routes.get("/tweets", isAuthenticated, async (req, res) => {
   try {
+    const cursor = req.query.cursor as string | undefined;
     // @ts-ignore
     const userId = req.user.id; 
-    const tweets = await storage.getAllTweets(userId, { limit: 15 });
-    return res.json({ data: tweets });
+    
+    // OTIMIZAÇÃO: Carrega apenas 5 tweets por vez para economizar dados do DB
+    const limit = 5; 
+
+    const tweets = await storage.getAllTweets(userId, { limit, cursor });
+    
+    let nextCursor: string | null = null;
+    if (tweets.length === limit) {
+      nextCursor = tweets[tweets.length - 1].createdAt.toISOString();
+    }
+
+    return res.json({ 
+        data: tweets,
+        nextCursor 
+    });
   } catch (error) {
     console.error("Error fetching tweets:", error);
     res.status(500).json({ message: "Erro interno" });
