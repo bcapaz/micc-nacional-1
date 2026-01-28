@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { routes } from "./routes";
+import { setupAuth } from "./auth"; // <--- ESTAVA FALTANDO ISSO
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -37,7 +38,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Registra as rotas
+// 1. CONFIGURA A AUTENTICAÇÃO (Sessão, Login, Registro)
+// Isso precisa vir ANTES das rotas da API
+setupAuth(app); 
+
+// 2. Registra as rotas da aplicação
 app.use("/api", routes);
 app.use(routes);
 
@@ -53,12 +58,10 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const server = createServer(app);
   const PORT = Number(process.env.PORT) || 5000;
 
-  // Lógica Blindada de Inicialização
+  // Lógica Blindada de Inicialização (Evita erro do Vite em Produção)
   if (process.env.NODE_ENV !== "production") {
     try {
-      // TRUQUE: Usamos uma variável para o import.
-      // Isso impede que o 'esbuild' tente agrupar o arquivo 'vite.ts' no build final,
-      // evitando o erro "Cannot find package 'vite'" em produção.
+      // TRUQUE: Usamos uma variável para o import dinâmico.
       const devVitePath = "./vite";
       const vite = await import(devVitePath);
       await vite.setupVite(app, server);
