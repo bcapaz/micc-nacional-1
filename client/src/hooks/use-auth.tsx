@@ -1,9 +1,5 @@
 import { createContext, ReactNode, useContext } from "react";
-import {
-  useQuery,
-  useMutation,
-  UseMutationResult,
-} from "@tanstack/react-query";
+import { useQuery, useMutation, UseMutationResult } from "@tanstack/react-query";
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryClient, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      // CORREÇÃO: Apontando explicitamente para /api/login
       const res = await apiRequest("POST", "/api/login", credentials);
       return await res.json();
     },
@@ -43,17 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
     },
     onError: (e: Error) => {
-      toast({
-        title: "Falha no login",
-        description: e.message,
-        variant: "destructive",
-      });
+      toast({ title: "Falha no login", description: e.message, variant: "destructive" });
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      // CORREÇÃO: Apontando explicitamente para /api/register
       const res = await apiRequest("POST", "/api/register", credentials);
       return await res.json();
     },
@@ -61,41 +51,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
     },
     onError: (e: Error) => {
-      toast({
-        title: "Falha no registro",
-        description: e.message,
-        variant: "destructive",
-      });
+      toast({ title: "Falha no registro", description: e.message, variant: "destructive" });
     },
   });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      // CORREÇÃO: Apontando explicitamente para /api/logout
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
     },
     onError: (e: Error) => {
-      toast({
-        title: "Falha ao sair",
-        description: e.message,
-        variant: "destructive",
-      });
+      toast({ title: "Falha ao sair", description: e.message, variant: "destructive" });
     },
   });
 
   return (
     <AuthContext.Provider
-      value={{
-        user: user ?? null,
-        isLoading,
-        error,
-        loginMutation,
-        logoutMutation,
-        registerMutation,
-      }}
+      value={{ user: user ?? null, isLoading, error, loginMutation, logoutMutation, registerMutation }}
     >
       {children}
     </AuthContext.Provider>
@@ -104,28 +78,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 }
 
 function getQueryFn({ on401 }: { on401: "throw" | "returnNull" }) {
   return async () => {
     try {
-      // CORREÇÃO: Check de sessão no endpoint correto
       const res = await fetch("/api/user");
       if (res.status === 401) {
         if (on401 === "returnNull") return null;
         throw new Error("Unauthorized");
       }
-      if (!res.ok) {
-        throw new Error("Failed to fetch user");
-      }
+      if (!res.ok) throw new Error("Failed to fetch user");
       return await res.json();
-    } catch (e) {
-      // Se der erro de conexão ou JSON inválido, retorna null para não travar
-      return null;
-    }
+    } catch (e) { return null; }
   };
 }
