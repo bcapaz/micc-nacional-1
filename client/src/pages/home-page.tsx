@@ -1,104 +1,122 @@
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { Sidebar } from "@/components/layout/sidebar";
+import { useAuth } from "@/hooks/use-auth";
+import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { TweetCard } from "@/components/tweet/tweet-card";
-import { TweetForm } from "@/components/tweet/tweet-form";
-import { TrendingSidebar } from "@/components/trending/trending-sidebar";
-import { type TweetWithUser } from "@shared/schema";
-import { Loader2 } from "lucide-react";
-import { Fragment } from "react";
+import { CreateTweet } from "@/components/tweet/create-tweet";
+import { Sidebar } from "@/components/layout/sidebar";
+import { Loader2, RefreshCw, ChevronDown } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { TweetWithUser } from "@shared/schema";
 
-// A função que busca os dados da nossa API
-// O parâmetro 'pageParam' é gerenciado pelo React Query e será o nosso cursor
-async function fetchTweets({ pageParam }: { pageParam: unknown }) {
-    const cursor = typeof pageParam === 'string' ? pageParam : '';
-    // Usamos encodeURIComponent para garantir que a data seja enviada corretamente na URL
-    const response = await fetch(`/api/tweets?cursor=${encodeURIComponent(cursor)}`);
-    if (!response.ok) {
-        throw new Error("Falha ao buscar os tweets.");
-    }
-    return response.json();
+// Interface para explicar o retorno da API paginada
+interface TweetsResponse {
+  data: TweetWithUser[];
+  nextCursor: string | null;
 }
 
 export default function HomePage() {
-    const queryClient = useQueryClient();
+  const { user } = useAuth();
 
-    // Hook para busca infinita (paginação)
-    const {
-        data,
-        isLoading,
-        isError,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage,
-    } = useInfiniteQuery({
-        queryKey: ["tweets"], // Chave única para esta query
-        queryFn: fetchTweets,
-        // Informa ao React Query como obter o cursor para a próxima página
-        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-        initialPageParam: undefined,
-    });
+  // BUSCA INFINITA (PAGINAÇÃO)
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    status,
+    refetch
+  } = useInfiniteQuery<TweetsResponse>({
+    queryKey: ["/api/tweets"],
+    queryFn: async ({ pageParam }) => {
+      // Se tiver um cursor (página seguinte), manda na URL
+      const url = pageParam 
+        ? `/api/tweets?cursor=${pageParam}` 
+        : `/api/tweets`;
+      
+      const res = await apiRequest("GET", url);
+      return res.json();
+    },
+    initialPageParam: null, // Começa do zero (topo)
+    getNextPageParam: (lastPage) => lastPage.nextCursor, // O backend diz qual o próximo
+  });
 
-    // Esta função será chamada pelo TweetForm após um novo tweet ser criado com sucesso
-    // Ela invalida a query, fazendo o React Query buscar os dados novamente para incluir o novo tweet
-    const handleSuccess = () => {
-        queryClient.invalidateQueries({ queryKey: ['tweets'] });
-    }
+  if (!user) return null;
 
-    return (
-        <div className="w-full max-w-6xl mx-auto grid grid-cols-12 gap-x-4 pt-4">
-            {/* Coluna Esquerda */}
-            <div className="col-span-3 hidden md:block">
-                 <Sidebar />
-            </div>
+  return (
+    <div className="min-h-screen bg-[#e9ebee] flex justify-center">
+      <div className="w-full max-w-[1012px] flex flex-col md:flex-row pt-4 gap-4 px-2">
+        
+        {/* SIDEBAR */}
+        <aside className="hidden md:block w-[180px] flex-shrink-0">
+          <Sidebar />
+        </aside>
 
-            {/* Coluna Central (Feed) */}
-            <div className="col-span-12 md:col-span-6">
-                <TweetForm onSuccess={handleSuccess} />
-                
-                <div className="mt-4 space-y-4">
-                    {isLoading && (
-                        <div className="flex justify-center py-8">
-                            <Loader2 className="h-8 w-8 animate-spin text-facebook-blue" />
-                        </div>
-                    )}
+        {/* FEED PRINCIPAL */}
+        <main className="flex-1 min-w-0">
+          <CreateTweet />
 
-                    {isError && (
-                        <div className="p-8 text-center text-red-500 bg-white rounded-lg shadow">
-                            Ocorreu um erro ao carregar as publicações.
-                        </div>
-                    )}
-
-                    {data?.pages.map((page, i) => (
-                        <Fragment key={i}>
-                            {page.data.map((tweet: TweetWithUser) => (
-                                <TweetCard key={tweet.id} tweet={tweet} />
-                            ))}
-                        </Fragment>
+          <div className="space-y-3 mb-8">
+            {status === "pending" ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" />
+              </div>
+            ) : status === "error" ? (
+              <div className="text-center p-4 bg-white rounded shadow text-red-500">
+                Erro ao carregar publicações.
+                <Button variant="link" onClick={() => refetch()}>Tentar novamente</Button>
+              </div>
+            ) : (
+              <>
+                {/* Renderiza todas as páginas carregadas */}
+                {data.pages.map((page, i) => (
+                  <div key={i} className="space-y-3">
+                    {page.data.map((tweet) => (
+                      <TweetCard key={tweet.id} tweet={tweet} />
                     ))}
-                </div>
+                  </div>
+                ))}
 
-                {/* Seção do Botão "Carregar mais" */}
+                {/* BOTÃO CARREGAR MAIS / PUBLICAÇÕES ANTIGAS */}
                 <div className="py-4 text-center">
-                    {hasNextPage && (
-                        <button
-                            onClick={() => fetchNextPage()}
-                            disabled={isFetchingNextPage}
-                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors"
-                        >
-                            {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
-                        </button>
-                    )}
-
-                    {!isLoading && !hasNextPage && (
-                        <p className="text-gray-500">Você chegou ao fim.</p>
-                    )}
+                  {isFetchingNextPage ? (
+                    <Button disabled variant="ghost" className="bg-white border shadow-sm">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Carregando...
+                    </Button>
+                  ) : hasNextPage ? (
+                    <Button 
+                      onClick={() => fetchNextPage()} 
+                      className="w-full bg-[#d8dfea] text-[#3b5998] hover:bg-[#caced6] font-bold shadow-sm border border-[#caced6]"
+                    >
+                      <ChevronDown className="mr-2 h-4 w-4" />
+                      Carregar publicações antigas
+                    </Button>
+                  ) : (
+                    <div className="text-gray-500 text-sm flex items-center justify-center gap-2">
+                      <div className="h-[1px] bg-gray-300 w-10"></div>
+                      <span>Não há mais publicações</span>
+                      <div className="h-[1px] bg-gray-300 w-10"></div>
+                    </div>
+                  )}
                 </div>
-            </div>
+              </>
+            )}
+          </div>
+        </main>
 
-            {/* Coluna Direita */}
-            <div className="col-span-3 hidden md:block">
-                <TrendingSidebar />
-            </div>
-        </div>
-    );
+        {/* COLUNA DIREITA (Opcional, se você tiver) */}
+        <aside className="hidden lg:block w-[280px] flex-shrink-0">
+           {/* Espaço para publicidade, aniversários, etc */}
+           <div className="bg-white border border-[#dfe3ee] p-3 rounded-sm shadow-sm text-xs text-gray-500">
+              <p className="font-bold text-[#3b5998] mb-2">Patrocinado</p>
+              <div className="h-20 bg-gray-100 flex items-center justify-center mb-2">
+                 Anúncio aqui
+              </div>
+              <p>Participe do debate presidencial 2014 com respeito e diplomacia.</p>
+           </div>
+        </aside>
+
+      </div>
+    </div>
+  );
 }
