@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext } from "react";
 import { useQuery, useMutation, UseMutationResult } from "@tanstack/react-query";
-import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
-import { getQueryClient, apiRequest, queryClient } from "@/lib/queryClient";
+import { User as SelectUser, InsertUser } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -26,7 +26,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/user");
+        
+        // Proteção contra HTML (Unexpected token <)
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") === -1) {
+            console.log("Recebi HTML em vez de JSON. Servidor pode estar iniciando ou rota incorreta.");
+            return null; // Retorna null em vez de quebrar a página
+        }
+
+        if (res.status === 401) return null;
+        if (!res.ok) return null;
+        
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    },
   });
 
   const loginMutation = useMutation({
@@ -51,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
     },
     onError: (e: Error) => {
-      toast({ title: "Falha no registro", description: e.message, variant: "destructive" });
+      toast({ title: "Registro falhou", description: e.message, variant: "destructive" });
     },
   });
 
@@ -63,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], null);
     },
     onError: (e: Error) => {
-      toast({ title: "Falha ao sair", description: e.message, variant: "destructive" });
+      toast({ title: "Erro ao sair", description: e.message, variant: "destructive" });
     },
   });
 
@@ -80,18 +98,4 @@ export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
-}
-
-function getQueryFn({ on401 }: { on401: "throw" | "returnNull" }) {
-  return async () => {
-    try {
-      const res = await fetch("/api/user");
-      if (res.status === 401) {
-        if (on401 === "returnNull") return null;
-        throw new Error("Unauthorized");
-      }
-      if (!res.ok) throw new Error("Failed to fetch user");
-      return await res.json();
-    } catch (e) { return null; }
-  };
 }
