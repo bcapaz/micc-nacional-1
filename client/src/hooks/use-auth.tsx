@@ -4,8 +4,8 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { InsertUser, User as SelectUser } from "@shared/schema";
-import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
+import { getQueryClient, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -20,38 +20,32 @@ type AuthContextType = {
 type LoginData = Pick<InsertUser, "username" | "password">;
 
 export const AuthContext = createContext<AuthContextType | null>(null);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+
   const {
     data: user,
     error,
     isLoading,
   } = useQuery<SelectUser | undefined, Error>({
-    queryKey: ["/user"], // Caminho simplificado
+    queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      // Caminho simplificado
-      const res = await apiRequest("POST", "/login", credentials);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Credenciais inválidas");
-      }
+      // CORREÇÃO: Apontando explicitamente para /api/login
+      const res = await apiRequest("POST", "/api/login", credentials);
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/user"], user);
-      toast({
-        title: "Login realizado com sucesso",
-        description: `Bem-vindo, ${user.name}!`,
-      });
+      queryClient.setQueryData(["/api/user"], user);
     },
-    onError: (error: Error) => {
+    onError: (e: Error) => {
       toast({
         title: "Falha no login",
-        description: error.message,
+        description: e.message,
         variant: "destructive",
       });
     },
@@ -59,25 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      // Caminho simplificado
-      const res = await apiRequest("POST", "/register", credentials);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Não foi possível criar a conta");
-      }
+      // CORREÇÃO: Apontando explicitamente para /api/register
+      const res = await apiRequest("POST", "/api/register", credentials);
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/user"], user);
-      toast({
-        title: "Registro realizado com sucesso",
-        description: "A sua conta foi criada e você já está logado!",
-      });
+      queryClient.setQueryData(["/api/user"], user);
     },
-    onError: (error: Error) => {
+    onError: (e: Error) => {
       toast({
         title: "Falha no registro",
-        description: error.message,
+        description: e.message,
         variant: "destructive",
       });
     },
@@ -85,20 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      // Caminho simplificado
-      await apiRequest("POST", "/logout");
+      // CORREÇÃO: Apontando explicitamente para /api/logout
+      await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/user"], null);
-      toast({
-        title: "Sessão encerrada",
-        description: "Você foi desconectado com sucesso.",
-      });
+      queryClient.setQueryData(["/api/user"], null);
     },
-    onError: (error: Error) => {
+    onError: (e: Error) => {
       toast({
-        title: "Falha ao encerrar sessão",
-        description: error.message,
+        title: "Falha ao sair",
+        description: e.message,
         variant: "destructive",
       });
     },
@@ -126,4 +108,24 @@ export function useAuth() {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
+}
+
+function getQueryFn({ on401 }: { on401: "throw" | "returnNull" }) {
+  return async () => {
+    try {
+      // CORREÇÃO: Check de sessão no endpoint correto
+      const res = await fetch("/api/user");
+      if (res.status === 401) {
+        if (on401 === "returnNull") return null;
+        throw new Error("Unauthorized");
+      }
+      if (!res.ok) {
+        throw new Error("Failed to fetch user");
+      }
+      return await res.json();
+    } catch (e) {
+      // Se der erro de conexão ou JSON inválido, retorna null para não travar
+      return null;
+    }
+  };
 }
