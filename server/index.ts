@@ -1,13 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { routes } from "./routes"; 
-import { setupVite, serveStatic, createViteServer } from "./vite";
+import { routes } from "./routes";
 import { createServer } from "http";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Middleware de Log: Mostra no terminal cada pedido que chega (GET, POST, DELETE)
+// Middleware de Log
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -36,12 +35,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- AQUI ESTÁ A CORREÇÃO DE ROTAS ---
-// Registra as rotas tanto em /api quanto na raiz para evitar erros de 404
-app.use("/api", routes); 
-app.use(routes);         
+// Correção de rotas duplas
+app.use("/api", routes);
+app.use(routes);
 
-// Error Handler Global
+// Error Handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
@@ -51,18 +49,22 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 (async () => {
   const server = createServer(app);
+  const isDev = app.get("env") === "development";
 
-  // Configuração do Frontend (Vite)
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
+  // CORREÇÃO DO ERRO DO VITE: Importação Dinâmica
+  // Só carrega o arquivo ./vite se estiver em desenvolvimento
+  if (isDev) {
+    const vite = await import("./vite");
+    await vite.setupVite(app, server);
   } else {
-    serveStatic(app);
+    // Em produção, usa apenas o serveStatic
+    const vite = await import("./vite");
+    vite.serveStatic(app);
   }
 
-  // --- CORREÇÃO DE REDE (IMPORTANTE) ---
-  // O Render precisa que a gente use 0.0.0.0, e não localhost
   const PORT = Number(process.env.PORT) || 5000;
   
+  // Mantendo a porta aberta para o Render (0.0.0.0)
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`[server]: Servidor rodando publicamente em http://0.0.0.0:${PORT}`);
   });
