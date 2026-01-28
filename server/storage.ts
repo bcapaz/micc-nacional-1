@@ -1,18 +1,19 @@
 import { db } from "@db";
 import { users, tweets, likes, reposts, type Repost } from "@shared/schema";
-import { eq, and, desc, sql, ne, ilike, lt } from "drizzle-orm";
+// ADICIONADO: inArray na importação abaixo
+import { eq, and, desc, sql, ne, ilike, lt, inArray } from "drizzle-orm";
 import { insertUserSchema } from "@shared/schema";
 import { type InsertUser, type User, type Tweet, type Like, type TweetWithUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { randomBytes } from "crypto";
-import { hashPassword } from "./auth"; // CORRIGIDO: Importação correta de auth
+import { hashPassword } from "./auth"; 
 
 export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User>;
+  updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string; isAdmin?: boolean }): Promise<User>;
   getAllTweets(currentUserId: number, options?: { limit?: number; cursor?: string }): Promise<TweetWithUser[]>;
   getUserTweets(userId: number, currentUserId: number): Promise<TweetWithUser[]>;
   createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet>;
@@ -67,7 +68,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
     if (!result[0]) throw new Error("Utilizador não encontrado.");
     return result[0];
-  } //
+  }
 
   async getAllTweets(currentUserId: number, options: { limit?: number; cursor?: string } = {}): Promise<TweetWithUser[]> {
     const { limit = 15, cursor } = options; 
@@ -94,7 +95,6 @@ export class DatabaseStorage implements IStorage {
       id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
       createdAt: tweets.createdAt, repostCount: tweets.repostCount,
       likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId}::integer = ${tweets.id}::integer)`.mapWith(Number),
-      // CORRIGIDO: Adicionado ::integer aqui
       commentCount: sql<number>`(SELECT COUNT(*) FROM ${tweets} AS comments WHERE (comments.parent_id)::integer = (${tweets.id})::integer)`.mapWith(Number),
       isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId}::integer = ${tweets.id}::integer AND ${likes.userId}::integer = ${currentUserId}::integer)`.mapWith(Boolean),
       isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId}::integer = ${tweets.id}::integer AND ${reposts.userId}::integer = ${currentUserId}::integer)`.mapWith(Boolean),
@@ -112,7 +112,6 @@ export class DatabaseStorage implements IStorage {
         id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
         createdAt: tweets.createdAt, repostCount: tweets.repostCount,
         likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId}::integer = ${tweets.id}::integer)`.mapWith(Number),
-        // CORRIGIDO: Adicionado ::integer aqui também
         commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE (comments.parent_id)::integer = (${tweets.id})::integer)`.mapWith(Number),
         isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId}::integer = ${tweets.id}::integer AND ${likes.userId}::integer = ${currentUserId}::integer)`.mapWith(Boolean),
         isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId}::integer = ${tweets.id}::integer AND ${reposts.userId}::integer = ${currentUserId}::integer)`.mapWith(Boolean),
@@ -131,7 +130,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet> {
-    // CORRIGIDO: Adicionado o ... (spread operator) para salvar os dados corretamente
     const [newTweet] = await db.insert(tweets).values({
       ...tweet, 
       likeCount: 0,
@@ -144,12 +142,30 @@ export class DatabaseStorage implements IStorage {
     return await db.query.tweets.findFirst({ where: eq(tweets.id, id) });
   }
 
+  // --- DELETE TWEET CORRIGIDO ---
   async deleteTweet(id: number): Promise<void> {
+    // 1. Encontrar todos os IDs dos comentários desta publicação
+    const comments = await db.select({ id: tweets.id }).from(tweets).where(eq(tweets.parentId, id));
+    const commentIds = comments.map(c => c.id);
+
+    // 2. Se houver comentários, apagar as dependências deles (likes e reposts)
+    if (commentIds.length > 0) {
+      await db.delete(likes).where(inArray(likes.tweetId, commentIds));
+      await db.delete(reposts).where(inArray(reposts.tweetId, commentIds));
+      await db.delete(tweets).where(inArray(tweets.parentId, commentIds));
+    }
+
+    // 3. Apagar os comentários da publicação principal
+    await db.delete(tweets).where(eq(tweets.parentId, id));
+
+    // 4. Apagar curtidas e reposts da publicação principal
     await db.delete(likes).where(eq(likes.tweetId, id));
     await db.delete(reposts).where(eq(reposts.tweetId, id));
-    await db.delete(tweets).where(eq(tweets.parentId, id));
+
+    // 5. Finalmente, apagar a publicação principal
     await db.delete(tweets).where(eq(tweets.id, id));
   }
+  // -----------------------------
 
   async createLike(like: { userId: number; tweetId: number }): Promise<void> {
     await db.transaction(async (tx) => {
