@@ -3,10 +3,10 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { TweetWithUser } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Heart, MessageSquare, Repeat2, Trash2, MoreHorizontal, ShieldAlert } from "lucide-react";
+import { Heart, MessageSquare, Repeat2, Trash2, MoreHorizontal, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query"; // Adicionado useQuery
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -25,20 +25,24 @@ interface TweetCardProps {
 export function TweetCard({ tweet }: TweetCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Controla se a área de comentários está aberta
   const [isCommenting, setIsCommenting] = useState(false);
   const [commentText, setCommentText] = useState("");
 
+  // 1. BUSCA OS COMENTÁRIOS (Só roda se a área estiver aberta)
+  const { data: comments, isLoading: isLoadingComments } = useQuery<TweetWithUser[]>({
+    queryKey: [`/api/tweets/${tweet.id}/comments`],
+    enabled: isCommenting, // Só busca quando o usuário clica em comentar
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      // MUDANÇA: Agora chama a rota comum, sem "/admin"
       await apiRequest("DELETE", `/api/tweets/${tweet.id}`);
     },
     onSuccess: () => {
-      // Mantém os invalidateQueries para atualizar a tela
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] }); 
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${user?.username}/tweets`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
-      
       toast({ title: "Sucesso", description: "Publicação excluída." });
     },
     onError: () => {
@@ -55,7 +59,6 @@ export function TweetCard({ tweet }: TweetCardProps) {
       }
     },
     onSuccess: () => {
-      // Atualiza o feed e o perfil para mostrar o like novo
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
     }
@@ -81,12 +84,17 @@ export function TweetCard({ tweet }: TweetCardProps) {
           await apiRequest("POST", `/api/tweets/${tweet.id}/comments`, { content: commentText });
       },
       onSuccess: () => {
+          // Atualiza o contador geral
           queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
-          setIsCommenting(false);
-          setCommentText("");
+          // Atualiza a lista de comentários deste post específico
+          queryClient.invalidateQueries({ queryKey: [`/api/tweets/${tweet.id}/comments`] });
+          
+          setCommentText(""); // Limpa o campo
           toast({ title: "Comentário enviado" });
       }
   });
+
+  const canDelete = user?.isAdmin || user?.id === tweet.userId;
 
   return (
     <div className="p-4 border-b border-[#dfe3ee] bg-white hover:bg-[#fafafa] transition-colors">
@@ -104,16 +112,14 @@ export function TweetCard({ tweet }: TweetCardProps) {
                   {tweet.user.name}
                 </a>
               </Link>
-              {tweet.user.isAdmin && <ShieldAlert className="w-3 h-3 text-green-600" title="Administrador" />}
+              {tweet.user.isAdmin && <ShieldCheck className="w-3 h-3 text-green-600" title="Administrador" />}
             </div>
             <div className="flex items-center space-x-2">
                 <span className="text-xs text-[#90949c]">
                 {formatDistanceToNow(new Date(tweet.createdAt), { addSuffix: true, locale: ptBR })}
                 </span>
                 
-                {/* BOTÃO DE DELETAR (Apenas Admin vê isso) */}
-                {/* Lógica: Mostra se for Admin OU se for o dono do post */}
-                {(user?.isAdmin || user?.id === tweet.userId) && (
+                {canDelete && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -144,54 +150,96 @@ export function TweetCard({ tweet }: TweetCardProps) {
             </div>
           )}
 
-          <div className="flex items-center justify-between mt-3 max-w-md">
+          {/* BOTÕES DE AÇÃO */}
+          <div className="flex items-center justify-between mt-3 max-w-md border-t border-[#f0f2f5] pt-1">
             <Button 
                 variant="ghost" 
                 size="sm" 
-                className={`text-xs gap-1 h-6 px-2 ${tweet.isLiked ? "text-[#3b5998] font-bold" : "text-[#7f7f7f]"}`}
+                className={`text-xs gap-1 h-8 px-2 ${tweet.isLiked ? "text-[#3b5998] font-bold" : "text-[#7f7f7f]"}`}
                 onClick={() => likeMutation.mutate()}
             >
               <Heart className={`w-4 h-4 ${tweet.isLiked ? "fill-current" : ""}`} />
-              {tweet.likeCount > 0 && tweet.likeCount} {tweet.likeCount === 1 ? "Curtida" : "Curtir"}
+              {tweet.likeCount > 0 ? `${tweet.likeCount} Curtidas` : "Curtir"}
             </Button>
 
             <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-xs gap-1 h-6 px-2 text-[#7f7f7f]"
+                className="text-xs gap-1 h-8 px-2 text-[#7f7f7f]"
                 onClick={() => setIsCommenting(!isCommenting)}
             >
               <MessageSquare className="w-4 h-4" />
-              {tweet.commentCount > 0 && tweet.commentCount} Comentar
+              {tweet.commentCount > 0 ? `${tweet.commentCount} Comentários` : "Comentar"}
             </Button>
 
             <Button 
                 variant="ghost" 
                 size="sm" 
-                className={`text-xs gap-1 h-6 px-2 ${tweet.isReposted ? "text-[#3b5998] font-bold" : "text-[#7f7f7f]"}`}
+                className={`text-xs gap-1 h-8 px-2 ${tweet.isReposted ? "text-[#3b5998] font-bold" : "text-[#7f7f7f]"}`}
                 onClick={() => repostMutation.mutate()}
             >
               <Repeat2 className="w-4 h-4" />
-              {tweet.repostCount > 0 && tweet.repostCount} Compartilhar
+              {tweet.repostCount > 0 ? `${tweet.repostCount} Reposts` : "Compartilhar"}
             </Button>
           </div>
 
+          {/* ÁREA DE COMENTÁRIOS */}
           {isCommenting && (
-              <div className="mt-3 flex gap-2">
-                  <Textarea 
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Escreva um comentário..."
-                      className="min-h-[32px] text-sm bg-[#f0f2f5] border-none focus-visible:ring-1 resize-none py-2"
-                  />
-                  <Button 
-                    size="sm" 
-                    className="bg-[#3b5998] h-auto py-2"
-                    onClick={() => commentMutation.mutate()}
-                    disabled={!commentText.trim() || commentMutation.isPending}
-                  >
-                      Enviar
-                  </Button>
+              <div className="mt-3 bg-[#f5f6f7] p-3 rounded-md">
+                  {/* Lista de Comentários Anteriores */}
+                  <div className="space-y-3 mb-4">
+                    {isLoadingComments ? (
+                      <div className="flex justify-center py-2"><Loader2 className="animate-spin h-4 w-4 text-[#3b5998]" /></div>
+                    ) : comments && comments.length > 0 ? (
+                      comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-2">
+                           <Link href={`/profile/${comment.user.username}`}>
+                              <a className="flex-shrink-0">
+                                <UserAvatar user={comment.user} size="xs" className="h-6 w-6" />
+                              </a>
+                           </Link>
+                           <div className="bg-white p-2 rounded-md border border-[#e5e5e5] flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <Link href={`/profile/${comment.user.username}`}>
+                                  <a className="text-xs font-bold text-[#3b5998] hover:underline">
+                                    {comment.user.name}
+                                  </a>
+                                </Link>
+                                <span className="text-[10px] text-gray-500">
+                                  {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: ptBR })}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#1d2129]">{comment.content}</p>
+                           </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-gray-500 text-center italic">Seja o primeiro a comentar.</p>
+                    )}
+                  </div>
+
+                  {/* Campo para Escrever Novo Comentário */}
+                  <div className="flex gap-2">
+                      <UserAvatar user={user!} size="xs" className="h-8 w-8 mt-1" />
+                      <div className="flex-1">
+                        <Textarea 
+                            value={commentText}
+                            onChange={(e) => setCommentText(e.target.value)}
+                            placeholder="Escreva um comentário..."
+                            className="min-h-[32px] text-sm bg-white border border-[#dfe3ee] focus-visible:ring-1 resize-none py-2 mb-2"
+                        />
+                        <div className="flex justify-end">
+                          <Button 
+                            size="sm" 
+                            className="bg-[#3b5998] h-7 text-xs px-4"
+                            onClick={() => commentMutation.mutate()}
+                            disabled={!commentText.trim() || commentMutation.isPending}
+                          >
+                              Comentar
+                          </Button>
+                        </div>
+                      </div>
+                  </div>
               </div>
           )}
         </div>
