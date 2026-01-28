@@ -30,19 +30,19 @@ export function TweetCard({ tweet }: TweetCardProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      // Chama a rota de admin para deletar
-      await apiRequest("delete", `/api/admin/tweets/${tweet.id}`);
+      // MUDANÇA: Agora chama a rota comum, sem "/admin"
+      await apiRequest("delete", `/api/tweets/${tweet.id}`);
     },
     onSuccess: () => {
-      // CORREÇÃO: As chaves agora incluem "/api" para bater com o useQuery do Home e Profile
+      // Mantém os invalidateQueries para atualizar a tela
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] }); 
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${user?.username}/tweets`] });
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
       
-      toast({ title: "Sucesso", description: "Publicação excluída com sucesso." });
+      toast({ title: "Sucesso", description: "Publicação excluída." });
     },
     onError: () => {
-      toast({ title: "Erro", description: "Não foi possível excluir a publicação.", variant: "destructive" });
+      toast({ title: "Erro", description: "Erro ao excluir.", variant: "destructive" });
     }
   });
 
@@ -112,7 +112,8 @@ export function TweetCard({ tweet }: TweetCardProps) {
                 </span>
                 
                 {/* BOTÃO DE DELETAR (Apenas Admin vê isso) */}
-                {user?.isAdmin && (
+                {/* Lógica: Mostra se for Admin OU se for o dono do post */}
+                {(user?.isAdmin || user?.id === tweet.userId) && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:bg-gray-100 rounded-full">
