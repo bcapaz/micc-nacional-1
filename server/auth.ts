@@ -24,16 +24,17 @@ async function comparePasswords(supplied: string, stored: string) {
 
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "segredo_padrao",
+    secret: process.env.SESSION_SECRET || "segredo_padrao_muito_seguro",
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
-      secure: app.get("env") === "production"
+      secure: app.get("env") === "production" // HTTPS em produção
     }
   };
 
+  // Importante para o Render (Proxy)
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
   }
@@ -51,7 +52,9 @@ export function setupAuth(app: Express) {
         } else {
           return done(null, user);
         }
-      } catch (error) { return done(error); }
+      } catch (error) {
+        return done(error);
+      }
     })
   );
 
@@ -60,29 +63,38 @@ export function setupAuth(app: Express) {
     try {
       const user = await storage.getUser(id);
       done(null, user);
-    } catch (error) { done(error); }
+    } catch (error) {
+      done(error);
+    }
   });
 
-  // Rotas de Auth
+  // --- ROTAS DE LOGIN (ESSENCIAIS) ---
+  
   app.post("/api/register", async (req, res, next) => {
     try {
       if (await storage.getUserByUsername(req.body.username)) {
-        return res.status(400).json({ message: "Usuário existe" });
+        return res.status(400).json({ message: "Usuário já existe" });
       }
       const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({ ...req.body, password: hashedPassword, isAdmin: false });
+      const user = await storage.createUser({
+        ...req.body,
+        password: hashedPassword,
+        isAdmin: false
+      });
       req.login(user, (err) => {
         if (err) return next(err);
         const { password, ...u } = user;
         res.status(201).json(u);
       });
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return next(err);
-      if (!user) return res.status(400).json({ message: "Falha no login" });
+      if (!user) return res.status(400).json({ message: "Login falhou" });
       req.login(user, (err) => {
         if (err) return next(err);
         const { password, ...u } = user;
