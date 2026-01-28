@@ -1,13 +1,12 @@
 import { db } from "@db";
 import { users, tweets, likes, reposts, type Repost } from "@shared/schema";
-// ADICIONADO: inArray na importação abaixo
 import { eq, and, desc, sql, ne, ilike, lt, inArray } from "drizzle-orm";
 import { insertUserSchema } from "@shared/schema";
 import { type InsertUser, type User, type Tweet, type Like, type TweetWithUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { randomBytes } from "crypto";
-import { hashPassword } from "./auth"; 
+import { hashPassword } from "./auth";
 
 export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
@@ -71,7 +70,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllTweets(currentUserId: number, options: { limit?: number; cursor?: string } = {}): Promise<TweetWithUser[]> {
-    const { limit = 15, cursor } = options; 
+    const { limit = 15, cursor } = options;
     const result = await db.select({
       id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
       createdAt: tweets.createdAt, likeCount: tweets.likeCount, repostCount: tweets.repostCount,
@@ -91,6 +90,7 @@ export class DatabaseStorage implements IStorage {
   async getUserTweets(userId: number, currentUserId: number): Promise<TweetWithUser[]> {
     const profileUser = await this.getUser(userId);
     const profileUsername = profileUser?.username ?? '';
+    
     const originalTweets = await db.select({
       id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
       createdAt: tweets.createdAt, repostCount: tweets.repostCount,
@@ -131,7 +131,7 @@ export class DatabaseStorage implements IStorage {
 
   async createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet> {
     const [newTweet] = await db.insert(tweets).values({
-      ...tweet, 
+      ...tweet,
       likeCount: 0,
       repostCount: 0
     }).returning();
@@ -142,47 +142,65 @@ export class DatabaseStorage implements IStorage {
     return await db.query.tweets.findFirst({ where: eq(tweets.id, id) });
   }
 
-  // --- DELETE TWEET CORRIGIDO ---
+  // SEM TRANSAÇÃO: Sequencial e Seguro
   async deleteTweet(id: number): Promise<void> {
-    // 1. Encontrar todos os IDs dos comentários desta publicação
+    console.log(`[STORAGE] Iniciando exclusão do tweet ${id}`);
+    
+    // 1. IDs dos comentários
     const comments = await db.select({ id: tweets.id }).from(tweets).where(eq(tweets.parentId, id));
     const commentIds = comments.map(c => c.id);
 
-    // 2. Se houver comentários, apagar as dependências deles (likes e reposts)
+    // 2. Limpar dependências dos comentários
     if (commentIds.length > 0) {
       await db.delete(likes).where(inArray(likes.tweetId, commentIds));
       await db.delete(reposts).where(inArray(reposts.tweetId, commentIds));
-      await db.delete(tweets).where(inArray(tweets.parentId, commentIds));
+      await db.delete(tweets).where(inArray(tweets.parentId, commentIds)); // netos
     }
 
-    // 3. Apagar os comentários da publicação principal
+    // 3. Limpar comentários
     await db.delete(tweets).where(eq(tweets.parentId, id));
 
-    // 4. Apagar curtidas e reposts da publicação principal
+    // 4. Limpar dependências do tweet principal
     await db.delete(likes).where(eq(likes.tweetId, id));
     await db.delete(reposts).where(eq(reposts.tweetId, id));
 
-    // 5. Finalmente, apagar a publicação principal
+    // 5. Limpar tweet principal
     await db.delete(tweets).where(eq(tweets.id, id));
+    
+    console.log(`[STORAGE] Tweet ${id} excluído com sucesso.`);
   }
-  // -----------------------------
 
+  // SEM TRANSAÇÃO: Updates diretos para evitar bloqueios
   async createLike(like: { userId: number; tweetId: number }): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.insert(likes).values(like);
-      await tx.update(tweets).set({ likeCount: sql`${tweets.likeCount} + 1` }).where(eq(tweets.id, like.tweetId));
-    });
+    await db.insert(likes).values(like);
+    await db.update(tweets)
+      .set({ likeCount: sql`${tweets.likeCount} + 1` })
+      .where(eq(tweets.id, like.tweetId));
   }
 
   async deleteLike(userId: number, tweetId: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.delete(likes).where(and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)));
-      await tx.update(tweets).set({ likeCount: sql`${tweets.likeCount} - 1` }).where(eq(tweets.id, tweetId));
-    });
+    await db.delete(likes).where(and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)));
+    await db.update(tweets)
+      .set({ likeCount: sql`${tweets.likeCount} - 1` })
+      .where(eq(tweets.id, tweetId));
   }
 
   async getLike(userId: number, tweetId: number): Promise<Like | undefined> {
     return await db.query.likes.findFirst({ where: and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)) });
+  }
+
+  async createRepost(userId: number, tweetId: number): Promise<void> {
+    await db.insert(reposts).values({ userId, tweetId });
+    await db.update(tweets)
+      .set({ repostCount: sql`${tweets.repostCount} + 1` })
+      .where(eq(tweets.id, tweetId));
+  }
+
+  async deleteRepost(userId: number, tweetId: number): Promise<void> {
+    await db.delete(reposts).where(and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)));
+    await db.update(tweets)
+      .set({ repostCount: sql`${tweets.repostCount} - 1` })
+      .where(eq(tweets.id, tweetId));
   }
 
   async getRandomUsers(excludeUserId: number, limit: number): Promise<User[]> {
@@ -220,20 +238,6 @@ export class DatabaseStorage implements IStorage {
 
   async getRepost(userId: number, tweetId: number): Promise<Repost | undefined> {
     return await db.query.reposts.findFirst({ where: and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)) });
-  }
-
-  async createRepost(userId: number, tweetId: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.insert(reposts).values({ userId, tweetId });
-      await tx.update(tweets).set({ repostCount: sql`${tweets.repostCount} + 1` }).where(eq(tweets.id, tweetId));
-    });
-  }
-
-  async deleteRepost(userId: number, tweetId: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.delete(reposts).where(and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)));
-      await tx.update(tweets).set({ repostCount: sql`${tweets.repostCount} - 1` }).where(eq(tweets.id, tweetId));
-    });
   }
 
   async getReposts(tweetId: number): Promise<(Repost & { user: User | null })[]> {
