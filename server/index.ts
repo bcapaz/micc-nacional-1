@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { routes } from "./routes";
 import { createServer } from "http";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
 app.use(express.json());
@@ -35,7 +37,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rotas
+// Registra as rotas
 app.use("/api", routes);
 app.use(routes);
 
@@ -51,27 +53,27 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const server = createServer(app);
   const PORT = Number(process.env.PORT) || 5000;
 
-  // OTIMIZAÇÃO DE DEPLOY:
-  // Usamos process.env.NODE_ENV para que o 'esbuild' consiga remover
-  // o código do Vite completamente na versão de produção (Dead Code Elimination).
+  // Lógica Blindada de Inicialização
   if (process.env.NODE_ENV !== "production") {
-    // Código de Desenvolvimento (só carrega localmente)
     try {
-        const vite = await import("./vite");
-        await vite.setupVite(app, server);
-    } catch (e) {
-        console.log("Vite não carregado (provavelmente produção):", e);
+      // TRUQUE: Usamos uma variável para o import.
+      // Isso impede que o 'esbuild' tente agrupar o arquivo 'vite.ts' no build final,
+      // evitando o erro "Cannot find package 'vite'" em produção.
+      const devVitePath = "./vite";
+      const vite = await import(devVitePath);
+      await vite.setupVite(app, server);
+    } catch (err) {
+      console.error("Erro ao iniciar modo Dev:", err);
     }
   } else {
-    // Código de Produção (Leve e Rápido)
-    // Não importamos o arquivo ./vite aqui para evitar dependências pesadas
-    const path = await import("path");
-    const { fileURLToPath } = await import("url");
+    // MODO PRODUÇÃO (Manual, sem dependências externas)
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     
-    // Serve os arquivos estáticos compilados
+    // Serve a pasta 'public' compilada
     app.use(express.static(path.join(__dirname, "public")));
+    
+    // Para qualquer outra rota não encontrada na API, serve o index.html (SPA)
     app.use("*", (_req, res) => {
       res.sendFile(path.join(__dirname, "public", "index.html"));
     });
