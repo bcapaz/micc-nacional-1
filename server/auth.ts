@@ -23,8 +23,6 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
-  console.log("🔒 [AUTH] Configurando sessão e passport...");
-
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "segredo_padrao",
     resave: false,
@@ -69,9 +67,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // --- REGISTRO EXPLÍCITO DAS ROTAS DE LOGIN ---
-  console.log("🔒 [AUTH] Registrando rotas: /api/login, /api/register, /api/user");
-
+  // ROTAS CORRETAS (API)
   app.post("/api/register", async (req, res, next) => {
     try {
       if (await storage.getUserByUsername(req.body.username)) {
@@ -88,19 +84,11 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    console.log(`🔑 [LOGIN ATTEMPT] Usuário tentando: ${req.body.username}`);
     passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) {
-          console.error("Erro no passport:", err);
-          return next(err);
-      }
-      if (!user) {
-          console.log("Falha: Senha ou usuário incorretos");
-          return res.status(400).json({ message: "Falha no login" });
-      }
+      if (err) return next(err);
+      if (!user) return res.status(400).json({ message: "Falha no login" });
       req.login(user, (err) => {
         if (err) return next(err);
-        console.log("Sucesso: Usuário logado!");
         const { password, ...u } = user;
         res.status(200).json(u);
       });
