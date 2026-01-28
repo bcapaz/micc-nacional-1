@@ -258,4 +258,86 @@ routes.post("/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (re
             return res.status(400).json({ message: "Você não pode remover seu próprio admin." });
         }
 
-        const updated
+        const updatedUser = await storage.updateUser(userId, { isAdmin: newStatus });
+        return res.json(updatedUser);
+    } catch (error) {
+        console.error("Erro ao alterar privilégios:", error);
+        res.status(500).json({ message: "Erro interno do servidor" });
+    }
+});
+
+
+// --- ROTAS DELETE ---
+
+routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        // @ts-ignore
+        const userId = req.user.id;
+        const existingLike = await storage.getLike(userId, tweetId);
+        if (!existingLike) {
+            return res.status(404).json({ message: "Curtida não encontrada" });
+        }
+        await storage.deleteLike(userId, tweetId);
+        return res.status(200).json({ message: "Descurtido" });
+    } catch (error) {
+        console.error("Error unliking tweet:", error);
+        res.status(500).json({ message: "Erro interno do servidor" });
+    }
+});
+
+routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        // @ts-ignore
+        const userId = req.user.id;
+        const existingRepost = await storage.getRepost(userId, tweetId);
+        if (!existingRepost) {
+            return res.status(404).json({ message: "Compartilhamento não encontrado" });
+        }
+        await storage.deleteRepost(userId, tweetId);
+        return res.status(200).json({ message: "Compartilhamento removido" });
+    } catch (error) {
+        console.error("Error deleting repost:", error);
+        return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+});
+
+// --- ROTA DE EXCLUSÃO INTELIGENTE E DIAGNÓSTICO ---
+routes.delete("/tweets/:id", isAuthenticated, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        
+        // LOG DE DIAGNÓSTICO
+        console.log(`[DELETE REQUEST] Tweet ID: ${tweetId}`);
+
+        // 1. Busca o tweet
+        const tweet = await storage.getTweetById(tweetId);
+        
+        if (!tweet) {
+            console.log(`[DELETE ERROR] Tweet ${tweetId} não encontrado.`);
+            return res.status(404).json({ message: "Publicação não encontrada" });
+        }
+
+        // 2. Garante que temos o usuário atual
+        // @ts-ignore
+        const currentUser = req.user;
+        
+        console.log(`[DELETE AUTH] Usuário atual: ${currentUser.id} (Admin: ${currentUser.isAdmin}) | Dono do Tweet: ${tweet.userId}`);
+
+        // 3. Verificação de Permissão: ADMIN ou DONO
+        if (!currentUser.isAdmin && tweet.userId !== currentUser.id) {
+            console.log(`[DELETE BLOCK] Permissão negada.`);
+            return res.status(403).json({ message: "Você não tem permissão para excluir esta publicação." });
+        }
+
+        // 4. Executa a exclusão
+        await storage.deleteTweet(tweetId);
+        
+        console.log(`[DELETE SUCCESS] Tweet ${tweetId} apagado.`);
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("[DELETE FATAL ERROR]:", error);
+        return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+});
