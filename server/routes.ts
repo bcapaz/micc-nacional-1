@@ -101,27 +101,23 @@ routes.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
 
 routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res) => {
     try {
-        console.log("📝 [POST TWEET] Recebendo requisição...");
+        console.log("📝 [PASSO 1] Recebendo POST Tweet...");
+        
+        // Log para Debugar o Tipo de Conteúdo
+        console.log("   🔍 Headers Content-Type:", req.headers['content-type']);
+        console.log("   📦 Body Bruto:", req.body);
+
         const content = req.body.content || "";
         let mediaData = null;
         if (req.file) {
+            console.log("   📷 [PASSO 1.5] Processando imagem...");
             mediaData = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
         }
         
         if (!content && !mediaData) {
-            console.log("❌ [POST TWEET] Conteúdo vazio");
+            console.log("❌ [ERRO] Conteúdo vazio. Body:", req.body);
             return res.status(400).json({ message: "Vazio" });
         }
-        
-        // CORREÇÃO CRÍTICA: Passamos isComment: false explicitamente
-        // @ts-ignore
-        const newTweet = await storage.createTweet({ 
-            content, 
-            userId: req.user.id, 
-            mediaData,
-            isComment: false, // Importante para o banco saber que é um post principal
-            parentId: null    // Importante para não vincular a nada
-        });
 
         console.log(`✅ [POST TWEET] Criado com sucesso: ID ${newTweet.id}`);
         return res.status(201).json(newTweet);
