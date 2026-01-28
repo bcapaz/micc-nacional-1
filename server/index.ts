@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { routes } from "./routes";
-import { setupAuth } from "./auth"; // Garante que login funciona
+import { setupAuth } from "./auth"; // Importa as rotas de login que criamos acima
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -9,10 +9,10 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Configura Autenticação
+// 1. PRIMEIRO: Configura Login (cria /api/login)
 setupAuth(app);
 
-// Rotas da API
+// 2. SEGUNDO: Configura Rotas da API (cria /api/tweets)
 app.use("/api", routes);
 app.use(routes);
 
@@ -28,22 +28,23 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const server = createServer(app);
   const PORT = Number(process.env.PORT) || 5000;
 
-  // LÓGICA DE INICIALIZAÇÃO BLINDADA
+  // Lógica Blindada de Inicialização (Sem erro de Vite em produção)
   if (process.env.NODE_ENV !== "production") {
     try {
-      // Truque para o compilador não incluir o Vite no build de produção
-      const devVitePath = "./vite"; 
+      const devVitePath = "./vite";
       const vite = await import(devVitePath);
       await vite.setupVite(app, server);
     } catch (err) {
-      console.error("Erro ao iniciar Vite:", err);
+      console.error("Erro Vite Dev:", err);
     }
   } else {
-    // Em produção, serve apenas os arquivos estáticos
+    // Modo Produção: Serve arquivos estáticos
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     
     app.use(express.static(path.join(__dirname, "public")));
+    
+    // Catch-all: Se não for API nem Login, manda pro React
     app.use("*", (_req, res) => {
       res.sendFile(path.join(__dirname, "public", "index.html"));
     });
