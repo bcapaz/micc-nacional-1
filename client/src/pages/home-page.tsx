@@ -4,7 +4,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { TweetCard } from "@/components/tweet/tweet-card";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Loader2, ChevronDown, ImageIcon, X } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient"; // Mantemos para o GET, mas não para o POST
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -16,7 +16,6 @@ interface TweetsResponse {
   nextCursor: string | null;
 }
 
-// --- CAIXA DE POSTAGEM ---
 function CreateTweetBox() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -29,19 +28,12 @@ function CreateTweetBox() {
 
   const createTweetMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // 🚨 CORREÇÃO AQUI: Usamos fetch direto em vez de apiRequest
-      // Isso permite que o navegador configure o multipart/form-data corretamente
+      // CORREÇÃO: Fetch nativo para garantir upload multipart correto
       const res = await fetch("/api/tweets", {
         method: "POST",
         body: formData,
-        // NÃO definimos headers aqui. O navegador faz isso sozinho para FormData.
       });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Falha ao publicar");
-      }
-      
+      if (!res.ok) throw new Error("Falha ao criar publicação");
       return res.json();
     },
     onSuccess: () => {
@@ -52,8 +44,7 @@ function CreateTweetBox() {
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
       toast({ title: "Publicado!", description: "Sua publicação foi enviada." });
     },
-    onError: (e) => {
-      console.error(e);
+    onError: () => {
       toast({ title: "Erro", description: "Falha ao publicar.", variant: "destructive" });
     }
   });
@@ -61,10 +52,7 @@ function CreateTweetBox() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { 
-        toast({ title: "Erro", description: "Imagem muito grande (max 5MB)", variant: "destructive" });
-        return;
-      }
+      if (file.size > 5 * 1024 * 1024) return;
       setSelectedImage(file);
       setPreviewUrl(URL.createObjectURL(file));
     }
@@ -79,15 +67,10 @@ function CreateTweetBox() {
 
   const handleSubmit = () => {
     if (!content.trim() && !selectedImage) return;
-
     const formData = new FormData();
     formData.append("content", content);
-    formData.append("isComment", "false"); // Garantia extra
-
-    if (selectedImage) {
-      formData.append("media", selectedImage);
-    }
-
+    formData.append("isComment", "false"); 
+    if (selectedImage) formData.append("media", selectedImage);
     createTweetMutation.mutate(formData);
   };
 
@@ -133,18 +116,9 @@ function CreateTweetBox() {
   );
 }
 
-// --- PÁGINA PRINCIPAL ---
 export default function HomePage() {
   const { user } = useAuth();
-
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    status,
-    refetch
-  } = useInfiniteQuery<TweetsResponse>({
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, status, refetch } = useInfiniteQuery<TweetsResponse>({
     queryKey: ["/api/tweets"],
     queryFn: async ({ pageParam }) => {
       const url = pageParam ? `/api/tweets?cursor=${pageParam}` : `/api/tweets`;
@@ -160,14 +134,9 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#e9ebee] flex justify-center">
       <div className="w-full max-w-[1012px] flex flex-col md:flex-row pt-4 gap-4 px-2">
-        
-        <aside className="hidden md:block w-[180px] flex-shrink-0">
-          <Sidebar />
-        </aside>
-
+        <aside className="hidden md:block w-[180px] flex-shrink-0"><Sidebar /></aside>
         <main className="flex-1 min-w-0">
           <CreateTweetBox />
-
           <div className="space-y-3 mb-8">
             {status === "pending" ? (
               <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" /></div>
@@ -177,36 +146,22 @@ export default function HomePage() {
               <>
                 {data.pages.map((page, i) => (
                   <div key={i} className="space-y-3">
-                    {page.data.map((tweet) => (
-                      <TweetCard key={tweet.id} tweet={tweet} />
-                    ))}
+                    {page.data.map((tweet) => <TweetCard key={tweet.id} tweet={tweet} />)}
                   </div>
                 ))}
-
                 <div className="py-4 text-center">
                   {isFetchingNextPage ? (
-                    <Button disabled variant="ghost" className="bg-white border shadow-sm"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando...</Button>
+                    <Button disabled variant="ghost"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando...</Button>
                   ) : hasNextPage ? (
-                    <Button onClick={() => fetchNextPage()} className="w-full bg-[#d8dfea] text-[#3b5998] hover:bg-[#caced6] font-bold shadow-sm border border-[#caced6]">
-                      <ChevronDown className="mr-2 h-4 w-4" />Carregar publicações antigas
-                    </Button>
+                    <Button onClick={() => fetchNextPage()} className="w-full bg-[#d8dfea] text-[#3b5998] hover:bg-[#caced6] font-bold shadow-sm border border-[#caced6]"><ChevronDown className="mr-2 h-4 w-4" />Mais</Button>
                   ) : (
-                    <div className="text-gray-500 text-sm flex justify-center gap-2"><div className="h-[1px] bg-gray-300 w-10 mt-2"></div><span>Fim das publicações</span><div className="h-[1px] bg-gray-300 w-10 mt-2"></div></div>
+                    <div className="text-gray-500 text-sm p-4">Fim das publicações</div>
                   )}
                 </div>
               </>
             )}
           </div>
         </main>
-
-        <aside className="hidden lg:block w-[280px] flex-shrink-0">
-           <div className="bg-white border border-[#dfe3ee] p-3 rounded-sm shadow-sm text-xs text-gray-500">
-              <p className="font-bold text-[#3b5998] mb-2">Patrocinado</p>
-              <div className="h-20 bg-gray-100 flex items-center justify-center mb-2">Anúncio aqui</div>
-              <p>Participe do debate presidencial 2014 com respeito e diplomacia.</p>
-           </div>
-        </aside>
-
       </div>
     </div>
   );
