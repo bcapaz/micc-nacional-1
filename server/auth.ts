@@ -29,7 +29,7 @@ export function setupAuth(app: Express) {
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
       secure: app.get("env") === "production"
     }
   };
@@ -51,9 +51,7 @@ export function setupAuth(app: Express) {
         } else {
           return done(null, user);
         }
-      } catch (error) {
-        return done(error);
-      }
+      } catch (error) { return done(error); }
     })
   );
 
@@ -62,12 +60,10 @@ export function setupAuth(app: Express) {
     try {
       const user = await storage.getUser(id);
       done(null, user);
-    } catch (error) {
-      done(error);
-    }
+    } catch (error) { done(error); }
   });
 
-  // ROTAS CORRETAS (API)
+  // Rotas de Auth
   app.post("/api/register", async (req, res, next) => {
     try {
       if (await storage.getUserByUsername(req.body.username)) {
