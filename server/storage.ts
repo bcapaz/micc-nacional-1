@@ -64,6 +64,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string; isAdmin?: boolean }): Promise<User> {
+    // APLICANDO A LÓGICA DO POST: .returning()
     const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
     if (!result[0]) throw new Error("Utilizador não encontrado.");
     return result[0];
@@ -130,6 +131,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet> {
+    // ESSE É O MODELO QUE FUNCIONA! USAREMOS .returning() EM TUDO
     const [newTweet] = await db.insert(tweets).values({
       ...tweet,
       likeCount: 0,
@@ -142,65 +144,76 @@ export class DatabaseStorage implements IStorage {
     return await db.query.tweets.findFirst({ where: eq(tweets.id, id) });
   }
 
-  // SEM TRANSAÇÃO: Sequencial e Seguro
+  // --- DELETE COM A TÉCNICA DO POST (.returning) ---
   async deleteTweet(id: number): Promise<void> {
-    console.log(`[STORAGE] Iniciando exclusão do tweet ${id}`);
+    console.log(`[STORAGE] Iniciando delete forçado do tweet ${id}`);
     
     // 1. IDs dos comentários
     const comments = await db.select({ id: tweets.id }).from(tweets).where(eq(tweets.parentId, id));
     const commentIds = comments.map(c => c.id);
 
-    // 2. Limpar dependências dos comentários
+    // 2. Limpar dependências dos comentários (Usando returning para forçar execução)
     if (commentIds.length > 0) {
-      await db.delete(likes).where(inArray(likes.tweetId, commentIds));
-      await db.delete(reposts).where(inArray(reposts.tweetId, commentIds));
-      await db.delete(tweets).where(inArray(tweets.parentId, commentIds)); // netos
+      await db.delete(likes).where(inArray(likes.tweetId, commentIds)).returning();
+      await db.delete(reposts).where(inArray(reposts.tweetId, commentIds)).returning();
+      await db.delete(tweets).where(inArray(tweets.parentId, commentIds)).returning(); 
     }
 
-    // 3. Limpar comentários
-    await db.delete(tweets).where(eq(tweets.parentId, id));
+    // 3. Limpar comentários diretos
+    await db.delete(tweets).where(eq(tweets.parentId, id)).returning();
 
     // 4. Limpar dependências do tweet principal
-    await db.delete(likes).where(eq(likes.tweetId, id));
-    await db.delete(reposts).where(eq(reposts.tweetId, id));
+    await db.delete(likes).where(eq(likes.tweetId, id)).returning();
+    await db.delete(reposts).where(eq(reposts.tweetId, id)).returning();
 
     // 5. Limpar tweet principal
-    await db.delete(tweets).where(eq(tweets.id, id));
+    const deleted = await db.delete(tweets).where(eq(tweets.id, id)).returning();
     
-    console.log(`[STORAGE] Tweet ${id} excluído com sucesso.`);
+    console.log(`[STORAGE] Resultado Delete:`, deleted);
   }
 
-  // SEM TRANSAÇÃO: Updates diretos para evitar bloqueios
+  // --- LIKES COM A TÉCNICA DO POST ---
   async createLike(like: { userId: number; tweetId: number }): Promise<void> {
-    await db.insert(likes).values(like);
+    // INSERT + RETURNING
+    await db.insert(likes).values(like).returning();
+    // UPDATE + RETURNING
     await db.update(tweets)
       .set({ likeCount: sql`${tweets.likeCount} + 1` })
-      .where(eq(tweets.id, like.tweetId));
+      .where(eq(tweets.id, like.tweetId))
+      .returning();
+      
+    console.log(`[STORAGE] Like criado para Tweet ${like.tweetId}`);
   }
 
   async deleteLike(userId: number, tweetId: number): Promise<void> {
-    await db.delete(likes).where(and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)));
+    await db.delete(likes).where(and(eq(likes.userId, userId), eq(likes.tweetId, tweetId))).returning();
     await db.update(tweets)
       .set({ likeCount: sql`${tweets.likeCount} - 1` })
-      .where(eq(tweets.id, tweetId));
+      .where(eq(tweets.id, tweetId))
+      .returning();
+
+    console.log(`[STORAGE] Like removido do Tweet ${tweetId}`);
   }
 
   async getLike(userId: number, tweetId: number): Promise<Like | undefined> {
     return await db.query.likes.findFirst({ where: and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)) });
   }
 
+  // --- REPOSTS COM A TÉCNICA DO POST ---
   async createRepost(userId: number, tweetId: number): Promise<void> {
-    await db.insert(reposts).values({ userId, tweetId });
+    await db.insert(reposts).values({ userId, tweetId }).returning();
     await db.update(tweets)
       .set({ repostCount: sql`${tweets.repostCount} + 1` })
-      .where(eq(tweets.id, tweetId));
+      .where(eq(tweets.id, tweetId))
+      .returning();
   }
 
   async deleteRepost(userId: number, tweetId: number): Promise<void> {
-    await db.delete(reposts).where(and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)));
+    await db.delete(reposts).where(and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId))).returning();
     await db.update(tweets)
       .set({ repostCount: sql`${tweets.repostCount} - 1` })
-      .where(eq(tweets.id, tweetId));
+      .where(eq(tweets.id, tweetId))
+      .returning();
   }
 
   async getRandomUsers(excludeUserId: number, limit: number): Promise<User[]> {
@@ -251,7 +264,7 @@ export class DatabaseStorage implements IStorage {
   async resetUserPassword(userId: number): Promise<string> {
     const newPassword = `mudar${randomBytes(3).toString('hex')}`;
     const hashedPassword = await hashPassword(newPassword);
-    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId)).returning();
     return newPassword;
   }
 }
