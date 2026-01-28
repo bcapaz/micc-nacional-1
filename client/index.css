@@ -14,10 +14,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 24% 14%;
 
-    --primary: 221 14% 96%; /* #3b5998 */
+    --primary: 221 44% 41%; /* Azul Clássico #3b5998 corrigido */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 13% 91%; /* Cor de fundo de botões secundários */
+    --secondary: 220 13% 91%;
     --secondary-foreground: 222 24% 14%;
 
     --muted: 220 13% 91%;
@@ -43,8 +43,17 @@
   }
 
   body {
-    /* Fonte e cor de fundo do Facebook 2014 */
-    @apply font-sans antialiased bg-facebook-grey text-facebook-grey-text;
+    @apply font-sans antialiased bg-[#e9ebee] text-[#1d2129];
     font-family: Helvetica, Arial, sans-serif;
+  }
+
+  /* SOLUÇÃO PARA O TEXTO BRANCO: Força visibilidade em todos os campos */
+  input, textarea {
+    color: #1d2129 !important;
+    background-color: #ffffff !important;
+  }
+
+  input::placeholder {
+    color: #8d949e !important;
   }
 }
