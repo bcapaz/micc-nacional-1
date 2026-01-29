@@ -157,7 +157,13 @@ export function TweetCard({ tweet }: TweetCardProps) {
           
           {tweet.mediaData && (
             <div className="mt-3 rounded-sm border border-[#dfe3ee] overflow-hidden">
-              <img src={tweet.mediaData} alt="Conteúdo da publicação" className="w-full h-auto block" />
+              <img 
+                 src={tweet.mediaData} 
+                 alt="Conteúdo da publicação" 
+                 className="w-full h-auto block" 
+                 loading="lazy" // <--- A MÁGICA ESTÁ AQUI
+                 decoding="async" // <--- E AQUI (ajuda na performance de renderização)
+              />
             </div>
           )}
 
