@@ -39,7 +39,7 @@ export function Sidebar() {
     }
 
     const externalLinks = [
-        { label: "Voltar ao Site", icon: <ArrowLeft className="w-5 h-5" />, href: "https://sites.google.com/view/sitenacionalmirim/in%C3%ADcio" }
+        { label: "Voltar ao Site", icon: <ArrowLeft className="w-5 h-5" />, href: "https://sites.google.com/view/sitenacionalmicc/in%C3%ADcio" }
     ];
 
     return (
