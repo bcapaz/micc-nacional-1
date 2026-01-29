@@ -1,159 +1,227 @@
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "wouter";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TweetCard } from "@/components/tweet/tweet-card";
-import { TrendingSidebar } from "@/components/trending/trending-sidebar";
-import { TweetWithUser, User } from "@shared/schema";
-import { Loader2, ArrowLeft, Share2 } from "lucide-react";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { ProfileEditForm } from "@/components/profile/profile-edit-form";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useParams } from "wouter";
+import { TweetCard } from "@/components/tweet/tweet-card";
+import { Sidebar } from "@/components/layout/sidebar";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { Button } from "@/components/ui/button";
+import { Loader2, CalendarDays, MapPin, Link as LinkIcon, Edit3, Camera } from "lucide-react";
+import { TweetWithUser, User } from "@shared/schema";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { compressImage } from "@/lib/compress"; // <--- Importamos o compressor
 
-// Funções de busca explícitas para evitar erro de JSON
-const fetchProfile = async (username: string): Promise<User> => {
-  const res = await fetch(`/api/profile/${username}`);
-  if (!res.ok) throw new Error("Perfil não encontrado");
-  return res.json();
-};
+function EditProfileDialog({ user }: { user: User }) {
+  const { toast } = useToast();
+  const [isOpen, setIsOpen] = useState(false);
+  const [username, setUsername] = useState(user.username);
+  const [bio, setBio] = useState(user.bio || "");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(user.profileImage || null);
+  const [isCompressing, setIsCompressing] = useState(false); // Estado de carregamento da compressão
 
-const fetchUserTweets = async (username: string): Promise<TweetWithUser[]> => {
-  const res = await fetch(`/api/profile/${username}/tweets`);
-  if (!res.ok) throw new Error("Erro ao carregar publicações");
-  return res.json();
-};
+  const updateMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      // Usamos fetch nativo para garantir o envio correto de arquivos (Multipart)
+      const res = await fetch("/api/profile/update", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!res.ok) throw new Error("Falha ao atualizar perfil");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/profile/${user.username}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] }); // Atualiza a sessão
+      setIsOpen(false);
+      toast({ title: "Perfil atualizado!" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Falha ao salvar alterações.", variant: "destructive" });
+    }
+  });
 
-function ProfileNotFound() {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Preview imediato
+      setPreviewUrl(URL.createObjectURL(file));
+      
+      try {
+        setIsCompressing(true);
+        // Comprime a imagem antes de preparar para envio
+        const compressed = await compressImage(file);
+        setSelectedImage(compressed);
+      } catch (err) {
+        console.error("Erro na compressão, usando original", err);
+        setSelectedImage(file);
+      } finally {
+        setIsCompressing(false);
+      }
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("username", username);
+    formData.append("bio", bio);
+    if (selectedImage) {
+      formData.append("profileImage", selectedImage);
+    }
+    updateMutation.mutate(formData);
+  };
+
   return (
-    <div className="flex-1">
-      <header className="sticky top-0 z-10 bg-[#3b5998] border-b border-[#29487d] text-white">
-        <div className="px-4 py-3 flex items-center">
-          <Link href="/" className="mr-6">
-            <ArrowLeft className="w-5 h-5 text-white" />
-          </Link>
-          <h2 className="text-xl font-bold">Página não encontrada</h2>
-        </div>
-      </header>
-      <div className="p-6 text-center text-muted-foreground bg-white mt-4 border border-[#dfe3ee]">
-        Esta linha do tempo não está disponível.
-      </div>
-    </div>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="font-bold">Editar perfil</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Editar Perfil</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <div className="flex justify-center mb-4">
+            <div className="relative group cursor-pointer">
+               <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-gray-200">
+                 {previewUrl ? (
+                   <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
+                 ) : (
+                   <div className="h-full w-full bg-gray-200 flex items-center justify-center text-gray-400">Sem foto</div>
+                 )}
+               </div>
+               <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                 <Camera className="text-white w-6 h-6" />
+               </div>
+               <input 
+                 type="file" 
+                 accept="image/*" 
+                 className="absolute inset-0 opacity-0 cursor-pointer" 
+                 onChange={handleImageChange}
+               />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="username">Nome de usuário</Label>
+            <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="bio">Biografia</Label>
+            <Textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Fale sobre você..." />
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button type="submit" disabled={updateMutation.isPending || isCompressing} className="bg-[#3b5998] hover:bg-[#2d4373]">
+              {updateMutation.isPending || isCompressing ? <Loader2 className="animate-spin h-4 w-4" /> : "Salvar"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
-}
-
-function ProfileError({ message }: { message: string }) {
-    return <div className="p-8 text-center text-destructive bg-white border border-red-200 mt-4">Erro ao carregar cronologia: {message}</div>
-}
-
-function ProfileLoading() {
-    return (
-        <div className="flex-1 flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" />
-        </div>
-    );
 }
 
 export default function ProfilePage() {
   const params = useParams();
-  const identifier = params.username; 
   const { user: currentUser } = useAuth();
+  
+  // Se não tem params.username, usa o do usuário logado (fallback)
+  const identifier = params.identifier || currentUser?.username;
 
-  const { data: profileUser, isLoading: isLoadingProfile, isError: isProfileError, error: profileError } = useQuery<User>({
+  const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: [`/api/profile/${identifier}`],
-    queryFn: () => fetchProfile(identifier!),
-    enabled: !!identifier,
   });
 
-  const { data: userTweets, isLoading: isLoadingTweets, isError: isTweetsError, error: tweetsError } = useQuery<TweetWithUser[]>({
+  const { data: tweets, isLoading: tweetsLoading } = useQuery<TweetWithUser[]>({
     queryKey: [`/api/profile/${identifier}/tweets`],
-    queryFn: () => fetchUserTweets(identifier!),
-    enabled: !!profileUser, 
+    enabled: !!user,
   });
 
-  const isOwnProfile = currentUser?.id === profileUser?.id;
+  if (userLoading) {
+    return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" /></div>;
+  }
 
-  const renderContent = () => {
-    if (isLoadingProfile) return <ProfileLoading />;
-    if (isProfileError) return <ProfileError message={profileError instanceof Error ? profileError.message : 'Erro de conexão'}/>;
-    if (!profileUser) return <ProfileNotFound />;
+  if (!user) {
+    return <div className="text-center p-8">Usuário não encontrado</div>;
+  }
 
-    return (
-      <div className="flex-1">
-        <header className="sticky top-0 z-10 bg-white border-b border-[#dfe3ee] mb-4">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center">
-                <Link href="/" className="mr-4 md:hidden"><ArrowLeft className="w-5 h-5" /></Link>
-                <h2 className="text-xl font-bold text-[#3b5998]">{profileUser.name || profileUser.username}</h2>
-            </div>
-            {isOwnProfile && <ProfileEditForm />}
-          </div>
-        </header>
-        
-        <div className="p-6 bg-white border border-[#dfe3ee] mb-4 shadow-sm">
-          <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
-            <UserAvatar user={profileUser} size="lg" className="h-32 w-32 border-4 border-white shadow-md" />
-            <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-bold text-[#1d2129]">{profileUser.name}</h1>
-                <p className="text-[#90949c] font-semibold">@{profileUser.username}</p>
-                {profileUser.bio && (
-                    <div className="mt-4 p-3 bg-[#f5f6f7] rounded border border-[#ebedf0] italic text-[#4b4f56]">
-                        "{profileUser.bio}"
-                    </div>
-                )}
-            </div>
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          {isLoadingTweets ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" /></div>
-          ) : isTweetsError ? (
-            <ProfileError message="Erro ao carregar publicações" />
-          ) : userTweets && userTweets.length > 0 ? (
-            userTweets.map(item => (
-              <div key={`${item.type}-${item.id}`} className="bg-white border border-[#dfe3ee] shadow-sm overflow-hidden">
-                {item.type === 'repost' && (
-                  <div className="flex items-center text-xs text-[#90949c] px-4 pt-3 font-bold">
-                    <Share2 className="w-3 h-3 mr-2" />
-                    <span>{item.repostedBy || 'Você'} compartilhou uma publicação</span>
-                  </div>
-                )}
-                <TweetCard tweet={item} />
-              </div>
-            ))
-          ) : (
-            <div className="p-8 text-center bg-white border border-[#dfe3ee] text-[#90949c]">
-                Nenhuma atividade recente na linha do tempo.
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  const isOwnProfile = currentUser?.id === user.id;
 
-return (
-    <div className="min-h-screen bg-[#e9ebee] flex justify-center"> {/* Fundo cinza e centralização total */}
-      <div className="w-full max-w-[1012px] flex flex-col md:flex-row pt-4 px-2 gap-4"> {/* Container com largura fixa do FB 2014 */}
-        
-        {/* Coluna da Esquerda (Menu) */}
-        <aside className="w-[180px] flex-shrink-0"> {/* Diminuímos a Sidebar para 180px, como no original */}
+  return (
+    <div className="min-h-screen bg-[#e9ebee] flex justify-center">
+      <div className="w-full max-w-[1012px] flex flex-col md:flex-row pt-4 gap-4 px-2">
+        <aside className="hidden md:block w-[180px] flex-shrink-0">
           <Sidebar />
         </aside>
 
-        {/* Coluna Central e Direita */}
-        <main className="flex-1 min-w-0"> {/* Removemos o md:ml-64 aqui */}
-          <div className="flex flex-col lg:flex-row gap-4">
-            <section className="flex-1 min-w-0">
-               {renderContent()}
-            </section>
-            
-            {/* Coluna da Direita (Tendências/Sugestões) */}
-            <aside className="w-[300px] flex-shrink-0 hidden lg:block">
-               <TrendingSidebar />
-            </aside>
+        <main className="flex-1 min-w-0">
+          {/* Capa e Info do Perfil */}
+          <div className="bg-white border border-[#dfe3ee] rounded-sm mb-4 overflow-hidden">
+             <div className="h-32 bg-[#3b5998] relative"></div>
+             <div className="px-4 pb-4">
+                <div className="flex justify-between items-end -mt-12 mb-4">
+                   <div className="relative">
+                      <div className="p-1 bg-white rounded-full">
+                        <UserAvatar user={user} className="h-32 w-32 text-4xl border border-[#dfe3ee]" />
+                      </div>
+                   </div>
+                   {isOwnProfile && <EditProfileDialog user={user} />}
+                </div>
+
+                <div>
+                   <h1 className="text-2xl font-bold text-[#1d2129]">{user.name}</h1>
+                   <p className="text-gray-500 text-sm">@{user.username}</p>
+                   {user.bio && <p className="mt-2 text-[#1d2129]">{user.bio}</p>}
+                   
+                   <div className="flex gap-4 mt-3 text-sm text-gray-500">
+                      <div className="flex items-center gap-1">
+                         <CalendarDays className="w-4 h-4" />
+                         <span>Ingressou em {format(new Date(user.createdAt || new Date()), "MMMM yyyy", { locale: ptBR })}</span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          <div className="space-y-3 mb-8">
+            <h3 className="font-bold text-[#4b4f56] px-1">Publicações</h3>
+            {tweetsLoading ? (
+              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" /></div>
+            ) : tweets && tweets.length > 0 ? (
+              tweets.map((tweet) => (
+                <TweetCard key={tweet.id} tweet={tweet} />
+              ))
+            ) : (
+              <div className="text-center p-8 bg-white border border-[#dfe3ee] rounded-sm text-gray-500">
+                Nenhuma publicação ainda.
+              </div>
+            )}
           </div>
         </main>
-        
+
+        <aside className="hidden lg:block w-[280px] flex-shrink-0">
+           <div className="bg-white border border-[#dfe3ee] p-3 rounded-sm shadow-sm text-xs text-gray-500">
+              <p className="font-bold text-[#3b5998] mb-2">Sugestões</p>
+              <p>Conecte-se com mais pessoas.</p>
+           </div>
+        </aside>
       </div>
     </div>
   );
