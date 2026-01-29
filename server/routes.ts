@@ -10,15 +10,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 // 🛠️ CORRETOR AUTOMÁTICO DE URL (O SALVADOR)
 // ====================================================================
 routes.use((req, res, next) => {
-    // Se a rota chegar como /api/tweets/..., removemos o /api extra
     if (req.url.startsWith('/api/')) {
         const original = req.url;
         req.url = req.url.replace('/api', '');
-        console.log(`🔧 [AUTO-FIX] URL corrigida: ${original} -> ${req.url}`);
+        // console.log(`🔧 [AUTO-FIX] URL corrigida: ${original} -> ${req.url}`);
     }
     next();
 });
-// ====================================================================
 
 const isAuthenticated = (req, res, next) => {
   if (!req.isAuthenticated()) return res.status(401).json({ message: "Login necessário" });
@@ -105,18 +103,31 @@ routes.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     return res.json(allUsers);
 });
 
-// --- POSTS ---
+// --- POSTS (COM DIAGNÓSTICO) ---
 
 routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res) => {
+    // 🕵️ ÁREA DE DIAGNÓSTICO
+    console.log("\n=================================");
+    console.log("🕵️ [DIAGNOSTIC] POST /tweets HIT");
+    console.log("=================================");
+    console.log("HEADERS:", req.headers['content-type']); // Verifica se é multipart
+    console.log("BODY:", req.body); // Verifica o texto
+    console.log("FILE:", req.file ? `Sim (${req.file.mimetype})` : "Não"); // Verifica a imagem
+
     try {
         const content = req.body.content || "";
         let mediaData = null;
         if (req.file) mediaData = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
         
-        if (!content && !mediaData) return res.status(400).json({ message: "Vazio" });
+        if (!content && !mediaData) {
+            console.error("❌ [DIAGNOSTIC] Cancelado: Body vazio.");
+            return res.status(400).json({ message: "Vazio", receivedBody: req.body });
+        }
         
         // @ts-ignore
-        const newTweet = await storage.createTweet({ content, userId: req.user.id, mediaData });
+        const newTweet = await storage.createTweet({ content, userId: req.user.id, mediaData, isComment: false });
+        console.log("✅ [DIAGNOSTIC] Tweet criado:", newTweet.id);
+        
         return res.status(201).json(newTweet);
     } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
 });
