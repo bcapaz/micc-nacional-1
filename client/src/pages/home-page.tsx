@@ -11,7 +11,6 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { TweetWithUser } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
-// Interface para a resposta paginada
 interface TweetsResponse {
   data: TweetWithUser[];
   nextCursor: string | null;
@@ -30,10 +29,31 @@ function CreateTweetBox() {
 
   const createTweetMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const res = await apiRequest("POST", "/api/tweets", formData);
+      // 🕵️ DIAGNÓSTICO FRONTEND
+      console.log("🕵️ [FRONT] Preparando envio...");
+      
+      // Lista o conteúdo do FormData para termos certeza
+      const entries = Array.from(formData.entries());
+      console.log("📦 [FRONT] Conteúdo exato:", entries);
+
+      // MUDANÇA CRÍTICA: Usamos fetch para garantir que o FormData
+      // seja enviado como multipart/form-data corretamente.
+      const res = await fetch("/api/tweets", {
+        method: "POST",
+        body: formData,
+        // NÃO definimos headers aqui. O navegador define o boundary sozinho.
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ [FRONT] Erro do servidor:", errorText);
+        throw new Error(errorText || "Erro ao publicar");
+      }
+
       return res.json();
     },
     onSuccess: () => {
+      console.log("✅ [FRONT] Sucesso no envio!");
       setContent("");
       setSelectedImage(null);
       setPreviewUrl(null);
@@ -41,7 +61,8 @@ function CreateTweetBox() {
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
       toast({ title: "Publicado!", description: "Sua publicação foi enviada." });
     },
-    onError: () => {
+    onError: (e) => {
+      console.error(e);
       toast({ title: "Erro", description: "Falha ao publicar.", variant: "destructive" });
     }
   });
@@ -69,7 +90,11 @@ function CreateTweetBox() {
     if (!content.trim() && !selectedImage) return;
     const formData = new FormData();
     formData.append("content", content);
+    // Garante que o backend saiba que não é um comentário
+    formData.append("isComment", "false"); 
+    
     if (selectedImage) formData.append("media", selectedImage);
+    
     createTweetMutation.mutate(formData);
   };
 
@@ -148,7 +173,6 @@ export default function HomePage() {
         </aside>
 
         <main className="flex-1 min-w-0">
-          {/* Componente Integrado aqui */}
           <CreateTweetBox />
 
           <div className="space-y-3 mb-8">
