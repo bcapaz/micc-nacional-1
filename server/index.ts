@@ -1,77 +1,67 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { routes } from "./routes";
-import { setupAuth } from "./auth";
-import { createServer } from "http";
+import "dotenv/config";
+import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import session from "express-session";
+import passport from "passport";
+import { storage } from "./storage";
+import { auth as authRouter } from "./auth";
+import { routes as api } from "./routes";
 
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// 1. LOG DE VIDA (Usando console.error para furar o buffer de logs)
-console.error("🔥 [STARTUP] Iniciando servidor...");
+async function main() {
+  const app = express();
+  const port = process.env.PORT || 3000;
 
-// 2. ROTA DE TESTE (Para ver se a API está viva)
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", env: process.env.NODE_ENV });
-});
+  app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-// 3. CONFIGURA AUTH (Acontece ANTES de tudo)
-try {
-  setupAuth(app);
-  console.error("✅ [STARTUP] Auth Configurado (Login Ativo)");
-} catch (e) {
-  console.error("❌ [FATAL] Erro ao configurar Auth:", e);
-}
+  const sessionSettings: session.SessionOptions = {
+    secret: process.env.SESSION_SECRET || 'uma-chave-secreta-muito-forte',
+    resave: false,
+    saveUninitialized: false,
+    store: storage.sessionStore,
+    cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  };
 
-// 4. CONFIGURA ROTAS DA API
-app.use("/api", routes);
-app.use(routes);
-
-// Error Handler
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  console.error(`❌ [ERRO] ${message}`);
-  res.status(status).json({ message });
-  throw err;
-});
-
-(async () => {
-  const server = createServer(app);
-  const PORT = Number(process.env.PORT) || 5000;
-
-  // LÓGICA DE PRODUÇÃO SIMPLIFICADA
-  if (process.env.NODE_ENV !== "development") {
-    // Estamos no Render (Produção)
-    console.error("🏭 [MODE] Produção detectada.");
-    
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const publicPath = path.join(__dirname, "public");
-    
-    // Serve estáticos
-    app.use(express.static(publicPath));
-    
-    // Catch-all (SPA)
-    app.use("*", (_req, res) => {
-      res.sendFile(path.join(publicPath, "index.html"));
-    });
-  } else {
-    // Estamos Local (Dev)
-    try {
-        // Truque da variável para o Bundler não quebrar o deploy
-        const devPath = "./vite";
-        const vite = await import(devPath);
-        await vite.setupVite(app, server);
-        console.error("🔧 [MODE] Desenvolvimento (Vite) ativo.");
-    } catch (e) {
-        console.error("⚠️ [DEV] Vite falhou (ok se for prod):", e);
-    }
+  if (process.env.NODE_ENV === 'production') {
+    app.set("trust proxy", 1);
   }
 
-  server.listen(PORT, "0.0.0.0", () => {
-    console.error(`🚀 [SERVER] Rodando na porta ${PORT}`);
+  app.use(session(sessionSettings));
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  app.use("/api", api);
+  app.use("/auth", authRouter);
+
+  if (process.env.NODE_ENV === "production") {
+    // CORREÇÃO FINAL: Aponta para a pasta 'public' DENTRO da pasta 'dist'.
+    // Isto corresponde à configuração 'outDir: ../dist/public' no seu vite.config.ts
+    const clientBuildPath = path.resolve(__dirname, "public");
+    console.log(`[server]: Servindo ficheiros estáticos de: ${clientBuildPath}`);
+    app.use(express.static(clientBuildPath));
+    
+    app.get("*", (req, res) => {
+      res.sendFile(path.resolve(clientBuildPath, "index.html"));
+    });
+  } else {
+    // Lógica de desenvolvimento com o Vite
+    console.log("[server]: Rodando em modo de desenvolvimento com Vite.");
+    const { createServer } = await import("vite");
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+      root: "client",
+    });
+    app.use(vite.middlewares);
+  }
+
+  app.listen(port, () => {
+    console.log(`[server]: Servidor rodando em http://localhost:${port}`);
   });
-})();
+}
+
+main();
