@@ -6,23 +6,22 @@ import { hashPassword } from "./auth";
 export const routes = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Middleware para limpar URL
+// ====================================================================
+// 🛠️ CORRETOR AUTOMÁTICO DE URL (O SALVADOR)
+// ====================================================================
 routes.use((req, res, next) => {
-    if (req.url.startsWith('/api/')) req.url = req.url.replace('/api', '');
+    // Se a rota chegar como /api/tweets/..., removemos o /api extra
+    if (req.url.startsWith('/api/')) {
+        const original = req.url;
+        req.url = req.url.replace('/api', '');
+        console.log(`🔧 [AUTO-FIX] URL corrigida: ${original} -> ${req.url}`);
+    }
     next();
 });
-
-// --- ROTA DE DIAGNÓSTICO (Teste se o servidor está vivo) ---
-routes.get("/debug/ping", (req, res) => {
-    console.log("🏓 [DEBUG] Ping recebido!");
-    res.json({ message: "PONG", user: req.user, time: new Date() });
-});
+// ====================================================================
 
 const isAuthenticated = (req, res, next) => {
-  if (!req.isAuthenticated()) {
-      console.log("⛔ [AUTH] Acesso negado. Usuário não logado.");
-      return res.status(401).json({ message: "Login necessário" });
-  }
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Login necessário" });
   next();
 };
 
@@ -32,59 +31,32 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-// --- POST TWEET (COM LOGS DETALHADOS) ---
-routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res) => {
-    console.log("\n📝 [POST TWEET] Iniciando...");
-    
-    // Diagnóstico do que chegou
-    console.log("   👤 Usuário:", (req.user as any)?.username);
-    console.log("   📦 Body:", req.body);
-    console.log("   📎 Arquivo:", req.file ? `Sim (${req.file.mimetype})` : "Não");
-
-    try {
-        const content = req.body.content || "";
-        let mediaData = null;
-
-        if (req.file) {
-            mediaData = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-        }
-        
-        if (!content && !mediaData) {
-            console.log("❌ [POST TWEET] Cancelado: Conteúdo vazio.");
-            return res.status(400).json({ message: "Vazio" });
-        }
-        
-        console.log("   🚀 [POST TWEET] Enviando para o banco...");
-        
-        // @ts-ignore
-        const newTweet = await storage.createTweet({ 
-            content, 
-            userId: (req.user as any).id, 
-            mediaData,
-            isComment: false 
-        });
-
-        console.log(`✅ [POST TWEET] Sucesso! ID: ${newTweet.id}`);
-        return res.status(201).json(newTweet);
-    } catch (e) { 
-        console.error("💥 [POST TWEET] Erro Fatal:", e); 
-        res.status(500).json({ message: "Erro ao criar publicação" }); 
-    }
-});
-
-// --- DEMAIS ROTAS ESSENCIAIS ---
+// --- ROTAS (Agora vão funcionar mesmo com URL errada) ---
 
 routes.get("/tweets", isAuthenticated, async (req, res) => {
   try {
     const cursor = req.query.cursor as string | undefined;
     // @ts-ignore
-    const tweets = await storage.getAllTweets(req.user.id, { limit: 5, cursor });
+    const userId = req.user.id; 
+    
+    // OTIMIZAÇÃO: Carrega apenas 5 tweets por vez para economizar dados do DB
+    const limit = 5; 
+
+    const tweets = await storage.getAllTweets(userId, { limit, cursor });
     
     let nextCursor: string | null = null;
-    if (tweets.length === 5) nextCursor = tweets[4].createdAt.toISOString();
+    if (tweets.length === limit) {
+      nextCursor = tweets[tweets.length - 1].createdAt.toISOString();
+    }
 
-    return res.json({ data: tweets, nextCursor });
-  } catch (error) { res.status(500).json({ message: "Erro" }); }
+    return res.json({ 
+        data: tweets,
+        nextCursor 
+    });
+  } catch (error) {
+    console.error("Error fetching tweets:", error);
+    res.status(500).json({ message: "Erro interno" });
+  }
 });
 
 routes.get("/profile/:identifier", isAuthenticated, async (req, res) => {
@@ -94,7 +66,7 @@ routes.get("/profile/:identifier", isAuthenticated, async (req, res) => {
         if (!isNaN(parseInt(identifier))) user = await storage.getUser(parseInt(identifier));
         else user = await storage.getUserByUsername(identifier);
         
-        if (!user) return res.status(404).json({ message: "Não encontrado" });
+        if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
         const { password, ...u } = user;
         return res.json(u);
     } catch (e) { res.status(500).json({ message: "Erro" }); }
@@ -106,6 +78,7 @@ routes.get("/profile/:identifier/tweets", isAuthenticated, async (req, res) => {
         let user;
         if (!isNaN(parseInt(identifier))) user = await storage.getUser(parseInt(identifier));
         else user = await storage.getUserByUsername(identifier);
+        
         if (!user) return res.status(404).json({ message: "User not found" });
         // @ts-ignore
         const userTweets = await storage.getUserTweets(user.id, req.user.id);
@@ -113,17 +86,18 @@ routes.get("/profile/:identifier/tweets", isAuthenticated, async (req, res) => {
     } catch (e) { res.status(500).json({ message: "Erro" }); }
 });
 
-routes.get('/tweets/:id/comments', isAuthenticated, async (req, res) => {
-    try {
-        const comments = await storage.getComments(parseInt(req.params.id));
-        if (!comments) return res.status(404).json({ error: "Erro" });
-        res.json({ success: true, count: comments.length, comments });
-    } catch (error) { res.status(500).json({ error: "Erro" }); }
-});
-
 routes.get("/users/delegates", isAuthenticated, async (req, res) => {
     const delegates = await storage.getNonAdminUsers();
     res.json(delegates);
+});
+
+routes.get('/tweets/:id/comments', isAuthenticated, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        const comments = await storage.getComments(tweetId);
+        if (!comments) return res.status(404).json({ error: "Comentários não encontrados" });
+        res.json({ success: true, count: comments.length, comments });
+    } catch (error) { res.status(500).json({ error: "Erro" }); }
 });
 
 routes.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
@@ -131,32 +105,56 @@ routes.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     return res.json(allUsers);
 });
 
-// Ações
-routes.post("/tweets/:id/like", isAuthenticated, async (req, res) => {
-    try { // @ts-ignore
-        const existing = await storage.getLike(req.user.id, parseInt(req.params.id));
-        if (existing) return res.status(409).json({ message: "Já curtido" });
+// --- POSTS ---
+
+routes.post("/tweets", isAuthenticated, upload.single('media'), async (req, res) => {
+    try {
+        const content = req.body.content || "";
+        let mediaData = null;
+        if (req.file) mediaData = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        
+        if (!content && !mediaData) return res.status(400).json({ message: "Vazio" });
+        
         // @ts-ignore
-        await storage.createLike({ userId: req.user.id, tweetId: parseInt(req.params.id) });
+        const newTweet = await storage.createTweet({ content, userId: req.user.id, mediaData });
+        return res.status(201).json(newTweet);
+    } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
+});
+
+routes.post("/tweets/:id/like", isAuthenticated, async (req, res) => {
+    try {
+        const tweetId = parseInt(req.params.id);
+        // @ts-ignore
+        const userId = req.user.id;
+        const existingLike = await storage.getLike(userId, tweetId);
+        if (existingLike) return res.status(409).json({ message: "Já curtido" });
+        
+        await storage.createLike({ userId, tweetId });
         return res.status(201).json({ message: "Curtiu" });
-    } catch (e) { res.status(500).json({ message: "Erro" }); }
+    } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
 });
 
 routes.post("/tweets/:id/comments", isAuthenticated, async (req, res) => {
-    try { // @ts-ignore
-        const newComment = await storage.createComment({ content: req.body.content, userId: req.user.id, tweetId: parseInt(req.params.id) });
+    try {
+        const tweetId = parseInt(req.params.id);
+        const { content } = req.body;
+        // @ts-ignore
+        const newComment = await storage.createComment({ content, userId: req.user.id, tweetId });
         res.status(201).json(newComment);
-    } catch (e) { res.status(500).json({ message: "Erro" }); }
+    } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
 });
 
 routes.post('/tweets/:id/repost', isAuthenticated, async (req, res) => {
-    try { // @ts-ignore
-        const existing = await storage.getRepost(req.user.id, parseInt(req.params.id));
-        if (existing) return res.status(409).json({ message: "Já compartilhado" });
+    try {
+        const tweetId = parseInt(req.params.id);
         // @ts-ignore
-        await storage.createRepost(req.user.id, parseInt(req.params.id));
+        const userId = req.user.id;
+        const existingRepost = await storage.getRepost(userId, tweetId);
+        if (existingRepost) return res.status(409).json({ message: "Já compartilhado" });
+        
+        await storage.createRepost(userId, tweetId);
         return res.status(201).json({ message: "Compartilhado" });
-    } catch (e) { res.status(500).json({ message: "Erro" }); }
+    } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
 });
 
 routes.post("/profile/update", isAuthenticated, upload.single('profileImage'), async (req, res) => {
@@ -169,34 +167,10 @@ routes.post("/profile/update", isAuthenticated, upload.single('profileImage'), a
     } catch (e) { res.status(500).json({ message: "Erro" }); }
 });
 
-routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
-    try { // @ts-ignore
-        await storage.deleteLike(req.user.id, parseInt(req.params.id));
-        return res.status(200).json({ message: "Descurtido" });
-    } catch (e) { res.status(500).json({ message: "Erro" }); }
-});
-
-routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
-    try { // @ts-ignore
-        await storage.deleteRepost(req.user.id, parseInt(req.params.id));
-        return res.status(200).json({ message: "Removido" });
-    } catch (e) { res.status(500).json({ message: "Erro" }); }
-});
-
-routes.delete("/tweets/:id", isAuthenticated, async (req, res) => {
-    try {
-        const tweet = await storage.getTweetById(parseInt(req.params.id));
-        if (!tweet) return res.status(404).json({ message: "Não encontrado" });
-        // @ts-ignore
-        if (!req.user.isAdmin && tweet.userId !== req.user.id) return res.status(403).json({ message: "Proibido" });
-        await storage.deleteTweet(tweet.id);
-        return res.status(200).json({ success: true });
-    } catch (error) { res.status(500).json({ message: "Erro" }); }
-});
-
 routes.post("/admin/users/:id/reset-password", isAuthenticated, isAdmin, async (req, res) => {
     try {
-        const hashedPassword = await hashPassword(req.body.newPassword);
+        const { newPassword } = req.body;
+        const hashedPassword = await hashPassword(newPassword);
         await storage.updateUser(parseInt(req.params.id), { password: hashedPassword });
         return res.status(200).json({ success: true });
     } catch (e) { res.status(500).json({ message: "Erro" }); }
@@ -204,9 +178,52 @@ routes.post("/admin/users/:id/reset-password", isAuthenticated, isAdmin, async (
 
 routes.post("/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (req, res) => {
     try {
-        const uid = parseInt(req.params.id); // @ts-ignore
+        const uid = parseInt(req.params.id);
+        // @ts-ignore
         if (uid === req.user.id) return res.status(400).json({message: "Erro"});
         const updated = await storage.updateUser(uid, { isAdmin: req.body.isAdmin });
         res.json(updated);
     } catch (e) { res.status(500).json({ message: "Erro" }); }
+});
+
+// --- DELETE ---
+
+routes.delete("/tweets/:id/like", isAuthenticated, async (req, res) => {
+    try {
+        // @ts-ignore
+        await storage.deleteLike(req.user.id, parseInt(req.params.id));
+        return res.status(200).json({ message: "Descurtido" });
+    } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
+});
+
+routes.delete('/tweets/:id/repost', isAuthenticated, async (req, res) => {
+    try {
+        // @ts-ignore
+        await storage.deleteRepost(req.user.id, parseInt(req.params.id));
+        return res.status(200).json({ message: "Removido" });
+    } catch (e) { console.error(e); res.status(500).json({ message: "Erro" }); }
+});
+
+// ROTA DELETE UNIFICADA (Com diagnóstico)
+routes.delete("/tweets/:id", isAuthenticated, async (req, res) => {
+    const tweetId = parseInt(req.params.id);
+    console.log(`🗑️ [DELETE] Recebido para ID ${tweetId}`);
+
+    try {
+        const tweet = await storage.getTweetById(tweetId);
+        if (!tweet) return res.status(404).json({ message: "Não encontrado" });
+
+        // @ts-ignore
+        const currentUser = req.user;
+        if (!currentUser.isAdmin && tweet.userId !== currentUser.id) {
+            return res.status(403).json({ message: "Proibido" });
+        }
+
+        await storage.deleteTweet(tweetId);
+        console.log(`✅ [DELETE] Sucesso para ID ${tweetId}`);
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("❌ [DELETE ERROR]", error);
+        return res.status(500).json({ message: "Erro interno" });
+    }
 });
