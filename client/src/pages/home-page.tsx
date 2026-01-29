@@ -10,13 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { TweetWithUser } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { compressImage } from "@/lib/compress"; // <--- Importamos o compressor
 
 interface TweetsResponse {
   data: TweetWithUser[];
   nextCursor: string | null;
 }
 
-// --- SUB-COMPONENTE: CAIXA DE POSTAGEM (Integrado) ---
 function CreateTweetBox() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -25,57 +25,49 @@ function CreateTweetBox() {
   const [content, setContent] = useState("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createTweetMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // 🕵️ DIAGNÓSTICO FRONTEND
-      console.log("🕵️ [FRONT] Preparando envio...");
-      
-      // Lista o conteúdo do FormData para termos certeza
-      const entries = Array.from(formData.entries());
-      console.log("📦 [FRONT] Conteúdo exato:", entries);
-
-      // MUDANÇA CRÍTICA: Usamos fetch para garantir que o FormData
-      // seja enviado como multipart/form-data corretamente.
+      // Fetch nativo para garantir upload multipart correto
       const res = await fetch("/api/tweets", {
         method: "POST",
         body: formData,
-        // NÃO definimos headers aqui. O navegador define o boundary sozinho.
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("❌ [FRONT] Erro do servidor:", errorText);
-        throw new Error(errorText || "Erro ao publicar");
-      }
-
+      if (!res.ok) throw new Error("Falha ao criar publicação");
       return res.json();
     },
     onSuccess: () => {
-      console.log("✅ [FRONT] Sucesso no envio!");
       setContent("");
       setSelectedImage(null);
       setPreviewUrl(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
-      toast({ title: "Publicado!", description: "Sua publicação foi enviada." });
+      toast({ title: "Publicado!" });
     },
-    onError: (e) => {
-      console.error(e);
+    onError: () => {
       toast({ title: "Erro", description: "Falha ao publicar.", variant: "destructive" });
     }
   });
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { 
-        toast({ title: "Erro", description: "Imagem muito grande (max 5MB)", variant: "destructive" });
-        return;
-      }
-      setSelectedImage(file);
+      // Mostra preview imediato (da original)
       setPreviewUrl(URL.createObjectURL(file));
+      
+      try {
+        setIsCompressing(true);
+        // Comprime a imagem em segundo plano
+        const compressed = await compressImage(file);
+        setSelectedImage(compressed);
+      } catch (err) {
+        console.error("Erro ao comprimir, usando original", err);
+        setSelectedImage(file);
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
 
@@ -90,11 +82,8 @@ function CreateTweetBox() {
     if (!content.trim() && !selectedImage) return;
     const formData = new FormData();
     formData.append("content", content);
-    // Garante que o backend saiba que não é um comentário
     formData.append("isComment", "false"); 
-    
     if (selectedImage) formData.append("media", selectedImage);
-    
     createTweetMutation.mutate(formData);
   };
 
@@ -124,6 +113,7 @@ function CreateTweetBox() {
                <div className="relative mt-2 mb-2 inline-block">
                  <img src={previewUrl} alt="Preview" className="max-h-60 rounded border border-gray-200" />
                  <button onClick={removeImage} className="absolute top-1 right-1 bg-gray-800/70 text-white rounded-full p-1 hover:bg-gray-900"><X className="w-3 h-3" /></button>
+                 {isCompressing && <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><Loader2 className="animate-spin text-black" /></div>}
                </div>
              )}
           </div>
@@ -131,7 +121,7 @@ function CreateTweetBox() {
         <div className="border-t border-[#e5e5e5] mt-3 pt-3 flex justify-between items-center">
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageSelect} />
             <div className="flex-1"></div>
-            <Button onClick={handleSubmit} disabled={(!content.trim() && !selectedImage) || createTweetMutation.isPending} className="bg-[#3b5998] hover:bg-[#2d4373] text-white font-bold h-7 text-xs px-4 rounded-sm">
+            <Button onClick={handleSubmit} disabled={(!content.trim() && !selectedImage) || createTweetMutation.isPending || isCompressing} className="bg-[#3b5998] hover:bg-[#2d4373] text-white font-bold h-7 text-xs px-4 rounded-sm">
               {createTweetMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Publicar"}
             </Button>
         </div>
@@ -140,18 +130,9 @@ function CreateTweetBox() {
   );
 }
 
-// --- PÁGINA PRINCIPAL ---
 export default function HomePage() {
   const { user } = useAuth();
-
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    status,
-    refetch
-  } = useInfiniteQuery<TweetsResponse>({
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, status, refetch } = useInfiniteQuery<TweetsResponse>({
     queryKey: ["/api/tweets"],
     queryFn: async ({ pageParam }) => {
       const url = pageParam ? `/api/tweets?cursor=${pageParam}` : `/api/tweets`;
@@ -167,14 +148,9 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#e9ebee] flex justify-center">
       <div className="w-full max-w-[1012px] flex flex-col md:flex-row pt-4 gap-4 px-2">
-        
-        <aside className="hidden md:block w-[180px] flex-shrink-0">
-          <Sidebar />
-        </aside>
-
+        <aside className="hidden md:block w-[180px] flex-shrink-0"><Sidebar /></aside>
         <main className="flex-1 min-w-0">
           <CreateTweetBox />
-
           <div className="space-y-3 mb-8">
             {status === "pending" ? (
               <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#3b5998]" /></div>
@@ -184,36 +160,22 @@ export default function HomePage() {
               <>
                 {data.pages.map((page, i) => (
                   <div key={i} className="space-y-3">
-                    {page.data.map((tweet) => (
-                      <TweetCard key={tweet.id} tweet={tweet} />
-                    ))}
+                    {page.data.map((tweet) => <TweetCard key={tweet.id} tweet={tweet} />)}
                   </div>
                 ))}
-
                 <div className="py-4 text-center">
                   {isFetchingNextPage ? (
-                    <Button disabled variant="ghost" className="bg-white border shadow-sm"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando...</Button>
+                    <Button disabled variant="ghost"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando...</Button>
                   ) : hasNextPage ? (
-                    <Button onClick={() => fetchNextPage()} className="w-full bg-[#d8dfea] text-[#3b5998] hover:bg-[#caced6] font-bold shadow-sm border border-[#caced6]">
-                      <ChevronDown className="mr-2 h-4 w-4" />Carregar publicações antigas
-                    </Button>
+                    <Button onClick={() => fetchNextPage()} className="w-full bg-[#d8dfea] text-[#3b5998] hover:bg-[#caced6] font-bold shadow-sm border border-[#caced6]"><ChevronDown className="mr-2 h-4 w-4" />Mais</Button>
                   ) : (
-                    <div className="text-gray-500 text-sm flex justify-center gap-2"><div className="h-[1px] bg-gray-300 w-10 mt-2"></div><span>Fim das publicações</span><div className="h-[1px] bg-gray-300 w-10 mt-2"></div></div>
+                    <div className="text-gray-500 text-sm p-4">Fim das publicações</div>
                   )}
                 </div>
               </>
             )}
           </div>
         </main>
-
-        <aside className="hidden lg:block w-[280px] flex-shrink-0">
-           <div className="bg-white border border-[#dfe3ee] p-3 rounded-sm shadow-sm text-xs text-gray-500">
-              <p className="font-bold text-[#3b5998] mb-2">Patrocinado</p>
-              <div className="h-20 bg-gray-100 flex items-center justify-center mb-2">Anúncio aqui</div>
-              <p>Participe do debate presidencial 2014 com respeito e diplomacia.</p>
-           </div>
-        </aside>
-
       </div>
     </div>
   );
